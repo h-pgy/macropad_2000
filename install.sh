@@ -75,7 +75,7 @@ else
   echo "    ATENÇÃO: $KB já existe. Adicione manualmente: \"alt+k\": \"voice:pushToTalk\" no contexto Chat"
 fi
 
-echo "==> emoji no título do terminal do Claude Code (hook UserPromptSubmit)"
+echo "==> emoji no título do terminal do Claude Code (hooks SessionStart e UserPromptSubmit)"
 python3 - "$HOME/.claude/settings.json" "$REPO/claude/title-hook.py" <<'PY'
 import json, os, sys, tempfile
 path, hook = sys.argv[1:]
@@ -88,14 +88,21 @@ except FileNotFoundError:
 except ValueError as e:
     print(f"    ATENÇÃO: {path} não é JSON válido ({e}), não mexi")
     sys.exit(0)
-groups = settings.setdefault("hooks", {}).setdefault("UserPromptSubmit", [])
-before = json.dumps(groups)
-# Tira versões antigas deste hook (ex.: repo clonado em outro caminho) e põe a atual.
-for g in groups:
-    g["hooks"] = [h for h in g.get("hooks", []) if "title-hook.py" not in h.get("command", "")]
-groups[:] = [g for g in groups if g.get("hooks")]
-groups.append({"hooks": [{"type": "command", "command": cmd}]})
-if json.dumps(groups) == before:
+hooks = settings.setdefault("hooks", {})
+before = json.dumps(hooks)
+# Tira versões antigas deste hook de todos os eventos (ex.: repo clonado em outro caminho)...
+for event in list(hooks):
+    for g in hooks[event]:
+        g["hooks"] = [h for h in g.get("hooks", []) if "title-hook.py" not in h.get("command", "")]
+    hooks[event] = [g for g in hooks[event] if g.get("hooks")]
+    if not hooks[event]:
+        del hooks[event]
+# ...e põe a atual. SessionStart (só sessão nova): título = só o emoji, para o perfil Claude
+# já valer; UserPromptSubmit: troca pelo "emoji + título".
+hooks.setdefault("SessionStart", []).append(
+    {"matcher": "startup", "hooks": [{"type": "command", "command": cmd}]})
+hooks.setdefault("UserPromptSubmit", []).append({"hooks": [{"type": "command", "command": cmd}]})
+if json.dumps(hooks, sort_keys=True) == json.dumps(json.loads(before), sort_keys=True):
     print("    já instalado")
     sys.exit(0)
 os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -106,7 +113,7 @@ with os.fdopen(fd, "w", encoding="utf-8") as f:
 if os.path.exists(path):
     os.chmod(tmp, os.stat(path).st_mode & 0o777)
 os.replace(tmp, path)
-print(f"    hook adicionado em {path}")
+print(f"    hooks adicionados em {path}")
 PY
 
 if [[ $EXT_NEW -eq 1 || $EXT_CHANGED -eq 1 ]]; then
