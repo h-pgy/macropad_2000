@@ -1,0 +1,25 @@
+# Configuração gravada no macropad com ch57x-keyboard-tool
+# (https://github.com/kriomant/ch57x-keyboard-tool).
+#
+# Cada botão manda só uma tecla F13..F21. O que cada uma faz fica em ../config.json,
+# então dá para mudar as funções sem regravar o teclado.
+#
+# Teclas como códigos HID (<104> = F13 ... <112> = F21).
+#
+#   ./ch57x-keyboard-tool validate macropad/claude-macropad.yaml
+#   sudo ./ch57x-keyboard-tool upload macropad/claude-macropad.yaml
+
+model: ch57x-2          # 1189:8890
+orientation: upsidedown # knob à esquerda, botões à direita (como é usado)
+rows: 2
+columns: 3
+knobs: 1
+
+layers:
+  - buttons:
+      - ["<104>", "<105>", "<106>"]   # F13 F14 F15  (botões 1 2 3)
+      - ["<107>", "<108>", "<109>"]   # F16 F17 F18  (botões 4 5 6)
+    knobs:
+      - ccw: "<110>"                  # F19
+        press: "<111>"                # F20
+        cw: "<112>"                   # F21

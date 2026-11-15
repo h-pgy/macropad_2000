@@ -1,0 +1,13 @@
+[Unit]
+Description=Macropad 2000 -> atalhos do Claude Code
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/python3 @REPO@/daemon/macropad_claude.py --config @REPO@/config.json
+Restart=on-failure
+RestartSec=3
+# Apps abertos pelo daemon (fallback sem a extensão) não morrem quando o serviço reinicia
+KillMode=process
+
+[Install]
+WantedBy=default.target

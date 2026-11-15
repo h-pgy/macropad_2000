@@ -1,0 +1,2582 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Macropad 2000</title>
+<script>
+  // tema forçado (claro/escuro) aplicado antes de pintar, para não piscar
+  try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}
+</script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b6862; --line: #e3e0da;
+    --key: #fbfaf8; --key-edge: #d6d2ca; --accent: #c4623a; --accent-ink: #fff;
+    --ok: #2f8a4c; --mode-locked: #f5c211; --mode-locked-ink: #241f31; --mode-auto: #1c71d8; --warn: #b7791f; --fail: #c0392b; --hit: #f2c14e; --hold: #d9534f;
+    --radius: 12px; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948; --s-other: #a8a49c;
+    /* altura das colunas da aba Perfis: tela menos header, título da página e barra de salvar */
+    --colh: max(460px, calc(100vh - 280px));
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #161614; --panel: #201f1d; --ink: #ecebe8; --muted: #9a968f; --line: #34322e;
+    --key: #2a2926; --key-edge: #403d38; --accent: #e07a4f; --accent-ink: #1a1a1a;
+    --ok: #5cc27e; --mode-locked: #f5c211; --mode-locked-ink: #241f31; --mode-auto: #1c71d8; --warn: #e3a944; --fail: #ef6b5d; --hit: #f2c14e; --hold: #ef6b5d;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; --s-other: #6b6862;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #161614; --panel: #201f1d; --ink: #ecebe8; --muted: #9a968f; --line: #34322e;
+      --key: #2a2926; --key-edge: #403d38; --accent: #e07a4f; --accent-ink: #1a1a1a;
+      --ok: #5cc27e; --mode-locked: #f5c211; --mode-locked-ink: #241f31; --mode-auto: #1c71d8; --warn: #e3a944; --fail: #ef6b5d; --hit: #f2c14e; --hold: #ef6b5d;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; --s-other: #6b6862;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scrollbar-color: var(--key-edge) var(--bg); }
+  body { margin: 0; background: var(--bg); color: var(--ink); padding-bottom: 150px;
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  [hidden] { display: none !important; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+           padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  h1 { font-size: 18px; margin: 0; letter-spacing: -.01em; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  h3 { font-size: 12px; margin: 20px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  h3:first-child { margin-top: 0; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { font-size: 12px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .pill::before { content: "●"; margin-right: 6px; }
+  .pill.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+  .pill.fail { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 40%, transparent); }
+  .pill.profile { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  /* modo do macropad: uma cor para cada (as mesmas da extensão do GNOME) */
+  .mode-badge { font: inherit; font-size: 14px; font-weight: 700; letter-spacing: .04em; color: #fff; cursor: pointer;
+                display: inline-flex; align-items: center; gap: 7px;
+                padding: 6px 16px; border-radius: 99px; border: 0; background: var(--mode-auto); white-space: nowrap;
+                box-shadow: 0 1px 0 rgba(0,0,0,.15); transition: background .2s, color .2s, transform .2s; }
+  .mode-badge.locked { background: var(--mode-locked); color: var(--mode-locked-ink); }
+  .mode-badge.off { background: var(--line); color: var(--muted); cursor: default; }
+  .mode-badge small { font-weight: 500; opacity: .85; margin-left: -1px; letter-spacing: 0; }
+  /* tecladinho; no modo fixo, com o cadeadinho do lado (os mesmos ícones da extensão) */
+  .mode-badge .ico { display: inline-flex; align-items: center; gap: 1px; }
+  .mode-badge .ico svg { width: 19px; height: 19px; flex: none; }
+  .mode-badge .ico svg.lock { width: 12px; height: 12px; }
+  .mode-badge.pop { transform: scale(1.12); }
+  .sysnote { font-size: 13px; margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+  .spacer { flex: 1; }
+  .switch { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-size: 14px; }
+  .switch input { width: 36px; height: 20px; appearance: none; border-radius: 99px; background: var(--line);
+                  position: relative; cursor: pointer; transition: background .15s; margin: 0; flex: none; }
+  .switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+                         border-radius: 50%; background: var(--panel); transition: left .15s; }
+  .switch input:checked { background: var(--accent); }
+  .switch input:checked::after { left: 18px; }
+  /* gaveta lateral (navegação) */
+  .drawer-toggle { display: grid; place-items: center; width: 36px; height: 36px; margin-left: -8px; padding: 0;
+                   background: none; border: 1px solid transparent; border-radius: 8px; color: var(--ink); cursor: pointer; }
+  .drawer-toggle:hover { border-color: var(--line); background: var(--bg); }
+  .drawer-toggle svg { width: 20px; height: 20px; }
+  .theme-toggle { margin: 0 -8px 0 0; }
+  .theme-toggle .sun { display: none; }
+  :root[data-theme="dark"] .theme-toggle .sun { display: block; }
+  :root[data-theme="dark"] .theme-toggle .moon { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .theme-toggle .sun { display: block; }
+    :root:not([data-theme="light"]) .theme-toggle .moon { display: none; }
+  }
+  .shell { display: flex; align-items: flex-start; }
+  nav.drawer { position: sticky; top: 0; flex: none; width: 220px; height: 100vh; overflow: hidden auto;
+               display: flex; flex-direction: column; gap: 4px; padding: 16px 12px;
+               background: var(--panel); border-right: 1px solid var(--line);
+               transition: width .18s ease, padding .18s ease, border-color .18s, visibility .18s; }
+  body.drawer-closed nav.drawer { width: 0; padding-left: 0; padding-right: 0; border-right-color: transparent; visibility: hidden; }
+  nav.drawer button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px;
+                      background: none; border: 0; border-radius: 8px; color: var(--muted);
+                      font: inherit; text-align: left; cursor: pointer; white-space: nowrap; }
+  nav.drawer button svg { width: 18px; height: 18px; flex: none; }
+  nav.drawer button:hover { background: var(--bg); color: var(--ink); }
+  nav.drawer button.active { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font-weight: 600; }
+  .drawer-scrim { display: none; }
+  main { flex: 1; min-width: 0; padding: 20px 28px 24px; max-width: 1700px; margin: 0 auto; }
+  .pagehead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 16px; }
+  .pagehead h2 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+  .pagehead p { margin: 0; color: var(--muted); font-size: 14px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 860px) {
+    .layout, .pgrid, .ugrid { grid-template-columns: 1fr; }
+    main { padding: 16px; } header { padding-left: 16px; padding-right: 16px; }
+    /* em tela estreita a gaveta flutua por cima do conteúdo */
+    nav.drawer { position: fixed; top: 0; left: 0; z-index: 20; box-shadow: var(--shadow); }
+    body:not(.drawer-closed) .drawer-scrim { display: block; position: fixed; inset: 0; z-index: 15; background: rgba(0,0,0,.3); }
+  }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); min-width: 0; }
+
+  /* seletor de perfil */
+  .ptabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .ptab { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 99px; cursor: pointer;
+          border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .ptab.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .gtabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+  .gtabs .ptab.add { color: var(--muted); border-style: dashed; }
+  .gtabs .ptab small { font-weight: 400; opacity: .8; margin-left: 4px; }
+  .gtabs .ptab:disabled { opacity: .5; cursor: not-allowed; }
+  .key.multi .num::after { content: " ⋯"; }
+  .ptab .live { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-left: 7px; vertical-align: middle; }
+
+  /* macropad */
+  .pad { display: flex; gap: 22px; align-items: center; justify-content: center; padding: 22px;
+         border-radius: 18px; background: linear-gradient(180deg, var(--key-edge), color-mix(in srgb, var(--key-edge) 70%, var(--bg)));
+         max-width: 560px; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-width: 0; }
+  .key { aspect-ratio: 1; border-radius: 10px; border: 1px solid var(--key-edge); background: var(--key);
+         color: var(--ink); cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;
+         padding: 8px; text-align: left; font: inherit; box-shadow: 0 3px 0 var(--key-edge);
+         transition: transform .06s, box-shadow .06s, background .2s, outline-color .15s; outline: 2px solid transparent; min-width: 0; }
+  .key .num { font-size: 11px; color: var(--muted); }
+  .lbl { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; max-width: 100%; }
+  .inh .lbl { font-weight: 400; font-style: italic; color: var(--muted); }
+  .key.sel, .knob.sel, .turn.sel { outline-color: var(--accent); }
+  /* botão que faz parte da combinação (escolhida agora ou selecionada): laranja claro */
+  .key.picked { background: color-mix(in srgb, var(--accent) 20%, var(--key)); border-color: color-mix(in srgb, var(--accent) 45%, var(--key-edge));
+                box-shadow: 0 3px 0 color-mix(in srgb, var(--accent) 45%, var(--key-edge)); }
+  .key.picked .num { color: var(--accent); font-weight: 700; }
+  .key.hit, .knob.hit, .turn.hit { background: var(--hit); color: #1d1c1a; transform: translateY(2px); box-shadow: 0 1px 0 var(--key-edge); }
+  .key.holding { background: var(--hold); color: #fff; }
+  .key.holding .num { color: #fff; }
+  .knob-area { display: flex; flex-direction: column; align-items: center; gap: 8px; order: -1; } /* knob à esquerda */
+  /* teclado girado 180°: knob à direita, botões 6 5 4 / 3 2 1 (cada número segue o botão físico) */
+  .pad.flip .knob-area { order: 1; }
+  .pad.flip .key[data-key="F13"] { order: 6; } .pad.flip .key[data-key="F14"] { order: 5; }
+  .pad.flip .key[data-key="F15"] { order: 4; } .pad.flip .key[data-key="F16"] { order: 3; }
+  .pad.flip .key[data-key="F17"] { order: 2; } .pad.flip .key[data-key="F18"] { order: 1; }
+  .rot-wrap { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 12px; }
+  .rot kbd { font: 11px ui-monospace, monospace; padding: 0 5px; border-radius: 4px; border: 1px solid currentColor; opacity: .7; }
+  /* modo combinação (Shift segurado ou o botão "Combinação"): só os botões 1 a 6 respondem */
+  .pad.chording .knob-area { opacity: .35; pointer-events: none; }
+  .knob-area { transition: opacity .15s; }
+  .pad.chording .key:not(.picked):hover { background: color-mix(in srgb, var(--accent) 8%, var(--key));
+                                          border-color: color-mix(in srgb, var(--accent) 30%, var(--key-edge)); }
+  .pad.chording .key::after { opacity: 0 !important; }
+  .rot { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 10px; border-radius: 99px;
+         border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: inherit; font-size: 13px;
+         cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+  .rot:hover { color: var(--ink); border-color: var(--muted); }
+  .rot[aria-pressed="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+                              background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
+  .rot svg { width: 18px; height: 18px; flex: none; transition: transform .45s cubic-bezier(.5, 0, .3, 1); }
+  #pad-flip[aria-pressed="true"] svg { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) { .rot svg { transition: none; } }
+  .knob { width: 92px; height: 92px; border-radius: 50%; border: 1px solid var(--key-edge); cursor: pointer;
+          background: radial-gradient(circle at 35% 30%, var(--key), color-mix(in srgb, var(--key-edge) 60%, var(--key)));
+          color: var(--ink); font: inherit; box-shadow: 0 3px 0 var(--key-edge);
+          outline: 2px solid transparent; transition: background .2s, transform .06s; padding: 8px; overflow: hidden; }
+  .knob .lbl { font-size: 12px; text-align: center; }
+  .turns { display: flex; gap: 6px; }
+  .turn { border: 1px solid var(--key-edge); background: var(--key); color: var(--ink); border-radius: 8px; max-width: 64px;
+          padding: 4px 6px; cursor: pointer; font: inherit; outline: 2px solid transparent; transition: background .2s; }
+  .turn .lbl { font-size: 11px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+
+  /* arrastar um botão sobre outro troca os dois */
+  .pad .key { position: relative; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .pad .key::after, .key.drag-ghost::after { content: "⋮⋮"; position: absolute; top: 6px; right: 8px; font-size: 12px; line-height: 1; letter-spacing: -2px;
+                     color: var(--muted); opacity: 0; transition: opacity .15s; pointer-events: none; }
+  .pad .key:hover::after { opacity: .75; }
+  .pad .grid.dnd .key { transition: transform .26s cubic-bezier(.3, 1.5, .5, 1), background .15s, outline-color .15s, border-color .15s; }
+  .pad .key.drag-origin { background: color-mix(in srgb, var(--ink) 7%, transparent); border: 1px dashed color-mix(in srgb, var(--ink) 28%, transparent);
+                          box-shadow: inset 0 2px 6px rgba(0,0,0,.12); outline-color: transparent; }
+  .pad .key.drag-origin > *, .pad .key.drag-origin::after { visibility: hidden; }
+  .pad .grid.armed .key.drag-origin { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .pad .key.swap-target { transform: translate(var(--tx, 0), var(--ty, 0)) scale(.95); outline-color: var(--accent);
+                          background: color-mix(in srgb, var(--accent) 14%, var(--key)); }
+  .pad .key.no-anim { transition: none !important; }
+  .pad .key.flying { z-index: 3; }
+  .pad .key.flying.top { z-index: 4; }
+  .key.drag-ghost { position: fixed; left: 0; top: 0; z-index: 50; margin: 0; pointer-events: none; will-change: transform;
+                    outline-color: var(--accent); transition: box-shadow .2s, background .2s;
+                    box-shadow: 0 18px 30px rgba(0,0,0,.22), 0 3px 0 var(--key-edge); }
+  .key.drag-ghost.snapped { box-shadow: 0 6px 14px rgba(0,0,0,.18), 0 3px 0 var(--key-edge); }
+  .key.drag-ghost::after { opacity: .75; }
+  body.key-dragging, body.key-dragging * { cursor: grabbing !important; }
+
+  /* combinações: dois botões apertados juntos */
+  .chords { margin: 16px 0 4px; }
+  .chords-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .chords-head h3 { margin: 0; }
+  .chords-head .sub { color: var(--muted); font-size: 12px; }
+  /* combinações configuradas: um cartão por combinação, com um mini teclado e o par em destaque */
+  .chord-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .chord-card { display: flex; align-items: center; gap: 12px; width: 100%; height: 100%; padding: 10px 12px; border-radius: 12px; cursor: pointer;
+                border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; text-align: left; min-width: 0;
+                outline: 2px solid transparent; transition: border-color .15s, outline-color .15s, background .2s; }
+  .chord-card:hover { border-color: var(--muted); }
+  .chord-card.sel { outline-color: var(--accent); border-color: var(--accent); }
+  .chord-card.hit { background: var(--hit); color: #1d1c1a; }
+  .ckb { display: flex; align-items: center; gap: 6px; flex: none; padding: 6px; border-radius: 8px;
+         background: linear-gradient(180deg, var(--key-edge), color-mix(in srgb, var(--key-edge) 70%, var(--bg))); }
+  .ckb .ck-knob { width: 18px; height: 18px; border-radius: 50%; background: var(--key); border: 1px solid var(--key-edge); }
+  .ckb .ck-grid { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; }
+  .ckb .ck { display: grid; place-items: center; height: 22px; border-radius: 4px; font-size: 10px; color: var(--muted);
+             background: var(--key); border: 1px solid var(--key-edge); }
+  .ckb .ck.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .chord-card .what { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .chord-card .what b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chord-card .what small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chord-list .empty { padding: 2px 0; grid-column: 1 / -1; }
+  /* no Global: a caixa "Herdar nos outros perfis" embaixo do cartão */
+  .chord-list li.with-share { display: flex; flex-direction: column; gap: 4px; }
+  .chord-list li.with-share .chord-card { flex: 1; }
+  .cshare { display: inline-flex; align-items: center; gap: 6px; padding: 0 4px; font-size: 12px; color: var(--muted); cursor: pointer; width: fit-content; }
+  .cshare input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+  .cshare:has(input:checked) { color: var(--ink); }
+  /* combinações herdadas do Global: uma linha discreta de fichas, separada das do perfil */
+  .chord-glob { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+  .chord-glob .cg-lbl { margin-right: 2px; }
+  .chord-glob .cg { font: inherit; font-size: 12px; color: var(--muted); background: transparent; border: 1px dashed var(--line);
+                    border-radius: 999px; padding: 2px 9px; cursor: pointer; font-style: italic; max-width: 100%;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: border-color .15s, background .2s; }
+  .chord-glob .cg b { font-style: normal; font-weight: 600; }
+  .chord-glob .cg:hover { border-color: var(--muted); color: var(--ink); }
+  .chord-glob .cg.sel { border-style: solid; border-color: var(--accent); color: var(--ink); }
+  .chord-glob .cg.off { text-decoration: line-through; opacity: .75; }
+  .chord-glob .cg.hit { background: var(--hit); color: #1d1c1a; }
+  /* aba Perfis: combinações embaixo do mini teclado */
+  .pchords { margin-top: 16px; }
+  .pchords h5 { margin: 0 0 8px; font-size: 13px; }
+  .pchords h5 .sub { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 4px; }
+  .pchords .chord-list { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  /* criar combinação: faixa pequena embaixo da lista (o mesmo desenho, menor) */
+  .chord-tray { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; padding: 8px 12px; border-radius: 12px;
+                border: 1px dashed var(--line); color: var(--muted); }
+  .chord-tray .key { width: 40px; height: 40px; flex: none; cursor: default; padding: 4px 6px; border-radius: 7px; box-shadow: 0 2px 0 var(--key-edge); }
+  .chord-tray .key .lbl { display: none; }
+  .chord-tray .key.picked { box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 45%, var(--key-edge)); }
+  .chord-tray .key.empty { justify-content: center; align-items: center; background: transparent; box-shadow: none; font-size: 15px; color: var(--muted);
+                           border: 1.5px dashed color-mix(in srgb, var(--ink) 22%, transparent); transition: border-color .15s, color .15s; }
+  .chord-tray .ct-plus { flex: none; font-size: 14px; color: var(--muted); }
+  .chord-tray .ct-what { flex: 1; min-width: 0; display: flex; flex-direction: column; margin-left: 4px; }
+  .chord-tray .ct-what b { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .chord-tray .ct-what small { font-size: 12px; }
+  .chord-tray.picking { border-color: var(--accent); border-style: solid; }
+  .chord-tray.idle { cursor: pointer; }
+  .chord-tray.idle:hover, .chord-tray.idle:focus-visible { border-color: var(--accent); }
+  .chord-tray.idle:hover .key.empty, .chord-tray.idle:focus-visible .key.empty { border-color: var(--accent); color: var(--accent); }
+
+  /* eventos: a lista fica na aba Uso; na aba Botões só a última linha */
+  .evrow { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); min-width: 0; font-size: 13px; }
+  .evrow time { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+  .evrow .k { font-family: ui-monospace, monospace; flex: none; }
+  .evrow .w { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #log { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow: auto; font-size: 13px; }
+  .ulive { margin-bottom: 16px; }
+  /* cabeçalho em flex (não float): em tela estreita o subtítulo desce sem espremer a lista */
+  .ulive h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+  .ulive h3 .tot { float: none; margin-left: auto; }
+  .lastev { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); border-bottom: 0; }
+  .lastev .t { flex: none; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .lastev .w { flex: 1 1 auto; }
+  #last-ev { display: contents; }
+  .evgo { flex: none; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--accent); cursor: pointer; }
+  .evgo:hover { text-decoration: underline; }
+  @media (max-width: 640px) { .lastev .t, .lastev .k, .lastev time { display: none; } }
+  .badge { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--line); color: var(--muted); margin-left: auto; white-space: nowrap; flex: none; }
+  .badge.test { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+  .badge.exec { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--ok); }
+  .badge.unk { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+  .empty { color: var(--muted); font-size: 13px; padding: 6px 0; }
+
+  /* modo teste: modal com os eventos que chegam, por cima de qualquer aba */
+  #test-modal { width: min(720px, calc(100% - 32px)); max-height: min(640px, calc(100vh - 64px)); padding: 0;
+                border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
+  #test-modal[open] { display: flex; flex-direction: column; }
+  #test-modal::backdrop { background: rgba(0,0,0,.35); }
+  #test-modal .tm-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 16px 18px 12px; border-bottom: 1px solid var(--line); }
+  #test-modal .tm-head h2 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+  #test-modal .tm-head h2::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent);
+                                    animation: tm-pulse 1.4s ease-in-out infinite; }
+  @keyframes tm-pulse { 50% { opacity: .25; } }
+  #test-modal .tm-head p { flex-basis: 100%; order: 3; margin: 0; font-size: 13px; color: var(--muted); }
+  #test-modal .tm-head .tm-count { margin-left: auto; font-size: 12px; color: var(--muted); }
+  #test-log { list-style: none; margin: 0; padding: 4px 18px; overflow: auto; flex: 1; min-height: 160px; }
+  #test-log .evrow:first-child:not(.empty) { animation: tm-in .35s ease-out; }
+  @keyframes tm-in { from { background: color-mix(in srgb, var(--hit) 35%, transparent); } }
+  #test-modal .tm-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
+  @media (max-width: 640px) { #test-log .k { display: none; } }
+
+  /* formulários */
+  label.f { display: block; margin-bottom: 14px; font-size: 13px; color: var(--muted); }
+  label.f > input, label.f > select, .row input, .row select { display: block; width: 100%; margin-top: 4px; font: inherit; color: var(--ink);
+         background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+  .row { display: flex; gap: 8px; align-items: stretch; margin-top: 4px; }
+  .row input, .row select { margin-top: 0; flex: 1; }
+  .mono { font-family: ui-monospace, monospace; }
+  label.check { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: -4px 0 14px; cursor: pointer; }
+  button.btn { font: inherit; font-size: 14px; border-radius: 8px; padding: 8px 14px; cursor: pointer;
+               border: 1px solid var(--line); background: var(--panel); color: var(--ink); white-space: nowrap; }
+  button.btn:hover:not(:disabled) { border-color: var(--muted); }
+  button.btn.sm { font-size: 12px; padding: 4px 9px; }
+  button.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button.btn.danger { color: var(--fail); }
+  button.btn.go { color: var(--ok); }
+  button.btn.caution { color: var(--warn); }
+  button.btn:disabled { opacity: .45; cursor: default; }
+  button.btn.capturing { border-color: var(--accent); color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 14px; }
+  .chip { font: 12px ui-monospace, monospace; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--ink); cursor: pointer; }
+  .chip:hover { border-color: var(--accent); }
+  /* carrossel de atalhos: 5 visíveis, maiores */
+  .carousel { display: flex; align-items: center; gap: 6px; margin: 0 0 14px; }
+  .car-view { flex: 1; min-width: 0; overflow: hidden; }
+  .car-track { display: flex; gap: 8px; transition: transform .35s ease; }
+  .car-track .chip { flex: 0 0 calc((100% - 32px) / 5); font-size: 13px; font-weight: 600; padding: 10px 2px; text-align: center;
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .car-arrow { font-size: 20px; line-height: 1; width: 30px; height: 38px; border-radius: 8px; cursor: pointer;
+               border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  .car-arrow:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .car-arrow:disabled { opacity: .3; cursor: default; }
+  .esc-hint { font-size: 12px; color: var(--muted); margin: -6px 0 8px; }
+  .esc-hint.on { color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { .car-track { transition: none; } }
+  .desc { background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+  .desc code, .chint code, .hint code { font-family: ui-monospace, monospace; background: var(--line); padding: 0 4px; border-radius: 4px; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+
+  /* perfis: lista | editor | janelas */
+  .pgrid { display: grid; grid-template-columns: 300px minmax(0, 1fr) 440px; gap: 20px; align-items: start; }
+  .pcard { padding: 0; display: flex; flex-direction: column; min-height: var(--colh); }
+  .chead { display: flex; align-items: center; gap: 8px; padding: 14px 18px 12px; border-bottom: 1px solid var(--line); }
+  .chead h3 { margin: 0; }
+  .chead .sub { margin-left: auto; font-size: 12px; color: var(--muted); text-align: right; }
+  .cfoot { margin: auto 0 0; padding: 12px 18px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .count { font-size: 11px; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 99px; padding: 0 7px; letter-spacing: 0; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+  .tag { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+  .tag.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: color-mix(in srgb, var(--ok) 8%, transparent); }
+
+  .plist { list-style: none; margin: 0; padding: 8px; }
+  .plist li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; cursor: pointer; margin-bottom: 2px; outline: none; }
+  .plist li:hover { background: var(--bg); }
+  .plist li:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+  .plist li.sel { background: color-mix(in srgb, var(--accent) 11%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+  .plist li.dragging { opacity: .4; }
+  .plist li.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+  .plist li.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+  .plist .grip { color: var(--key-edge); font-size: 13px; letter-spacing: -2px; width: 12px; cursor: grab; flex: none; }
+  .plist .prio { font-size: 12px; color: var(--muted); width: 16px; text-align: right; font-variant-numeric: tabular-nums; flex: none; }
+  .plist .pname { flex: 1; min-width: 0; font-weight: 500; }
+  .plist .pname b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plist .pname small { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .plist .live { color: var(--ok); display: inline-flex; align-items: center; gap: 5px; }
+  .plist .live .dot { width: 7px; height: 7px; }
+  .plist .mv { display: flex; gap: 2px; visibility: hidden; }
+  .plist li:hover .mv, .plist li.sel .mv, .plist li:focus-within .mv { visibility: visible; }
+  .plist .mv .btn { padding: 1px 6px; }
+  .psep { margin: 4px 18px; border-top: 1px dashed var(--line); }
+
+  .edhead { display: flex; align-items: flex-start; gap: 16px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+  .edhead .info { flex: 1; min-width: 0; }
+  .pname-in { font: inherit; font-size: 20px; font-weight: 650; color: var(--ink); width: 100%; max-width: 420px;
+              background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 2px 8px; margin-left: -9px; }
+  .pname-in:hover:not(:disabled), .pname-in:focus { background: var(--bg); border-color: var(--line); outline: none; }
+  .pname-in:disabled { color: var(--ink); }
+  .edmeta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; font-size: 13px; color: var(--muted); align-items: center; }
+  .sec { padding: 18px 22px; border-bottom: 1px solid var(--line); }
+  .sec h4 { margin: 0 0 4px; font-size: 14px; }
+  .sec .lead { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+  .sec .acts-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 10px; }
+  .sec .acts-row .hint { margin: 0; }
+  .rtable { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .rule { display: grid; grid-template-columns: 1.6fr 1fr 1.2fr 1.2fr 150px 30px; gap: 8px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--line); }
+  .rule-head { border-top: 0; background: var(--bg); font-size: 12px; color: var(--muted); padding: 7px 10px; }
+  .rule input { font: 13px ui-monospace, monospace; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+                border-radius: 7px; padding: 6px 8px; min-width: 0; width: 100%; }
+  .rule .m { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .rule .m.ok { color: var(--ok); }
+  .rule .m.rec { color: color-mix(in srgb, var(--ok) 65%, var(--muted)); }
+  .rule .x { padding: 2px 0; border-color: transparent; color: var(--muted); }
+  .rtable .empty { padding: 10px; border-top: 1px solid var(--line); }
+  @media (max-width: 640px) { .rule { grid-template-columns: 1fr; } .rule-head { display: none; } }
+  .minirow { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; }
+  .minipad { display: flex; gap: 16px; align-items: center; padding: 14px; border-radius: 14px;
+             background: linear-gradient(180deg, var(--key-edge), color-mix(in srgb, var(--key-edge) 70%, var(--bg))); }
+  .mgrid { display: grid; grid-template-columns: repeat(3, 92px); gap: 8px; }
+  .mk { height: 58px; border-radius: 9px; background: var(--key); border: 1px solid var(--key-edge); box-shadow: 0 2px 0 var(--key-edge);
+        padding: 6px 8px; display: flex; flex-direction: column; justify-content: space-between; text-align: left;
+        font: inherit; color: var(--ink); cursor: pointer; min-width: 0; }
+  .mk .num { font-size: 10px; color: var(--muted); }
+  .mk .lbl { font-size: 12px; }
+  .mk:hover { border-color: var(--accent); }
+  .mknob { width: 70px; height: 70px; border-radius: 50%; border: 1px solid var(--key-edge); box-shadow: 0 2px 0 var(--key-edge);
+           background: radial-gradient(circle at 35% 30%, var(--key), color-mix(in srgb, var(--key-edge) 60%, var(--key)));
+           font: inherit; color: var(--ink); cursor: pointer; padding: 6px; overflow: hidden; }
+  .mknob .lbl { font-size: 11px; text-align: center; }
+  .mknob:hover { border-color: var(--accent); }
+  .legend { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+  .legend .inh { font-style: italic; }
+  .dzone { display: flex; align-items: center; gap: 12px; padding: 14px 22px; margin-top: auto; border-top: 1px solid var(--line); }
+  .dzone p { margin: 0; flex: 1; font-size: 13px; color: var(--muted); }
+
+  .wincard { position: sticky; top: 16px; height: var(--colh); }
+  .wnow { padding: 12px 16px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--accent) 4%, var(--panel)); }
+  .wlbl { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .wfilter { padding: 12px 16px 0; }
+  .wfilter input { width: 100%; font: inherit; font-size: 13px; color: var(--ink); background: var(--bg);
+                   border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+  .wcount { padding: 10px 16px 6px; margin: 0; }
+  /* lista rolável; as sombras em cima/embaixo só aparecem quando há mais conteúdo naquela direção */
+  .wscroll { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 10px 12px 16px; border-radius: 0 0 var(--radius) var(--radius);
+             scrollbar-width: thin; scrollbar-gutter: stable; scrollbar-color: var(--key-edge) transparent;
+             background:
+               linear-gradient(var(--panel) 30%, transparent) top / 100% 28px no-repeat local,
+               linear-gradient(transparent, var(--panel) 70%) bottom / 100% 28px no-repeat local,
+               radial-gradient(farthest-side at 50% 0, rgba(0,0,0,.14), transparent) top / 100% 10px no-repeat scroll,
+               radial-gradient(farthest-side at 50% 100%, rgba(0,0,0,.14), transparent) bottom / 100% 10px no-repeat scroll; }
+  .wscroll .win { background: transparent; }
+  .win { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 1px 10px; border: 1px solid var(--line); border-radius: 10px;
+         padding: 10px 12px; margin-bottom: 8px; background: var(--panel); min-width: 0; }
+  .win[role="button"] { cursor: pointer; }
+  .win[role="button"]:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+  .win[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .win.open:not(.current) { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent); }
+  .win.current { border-color: color-mix(in srgb, var(--accent) 50%, transparent); margin-bottom: 0; }
+  .win .av { grid-row: span 3; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+             font-weight: 700; font-size: 13px; color: #fff; }
+  .win .top { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+  .win .app { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .win .to { font-size: 11px; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent);
+             border-radius: 99px; padding: 0 7px; white-space: nowrap; }
+  .win .to.g { color: var(--muted); background: var(--bg); }
+  .win .ago { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .win .title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .win .meta { font: 11.5px ui-monospace, monospace; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .win .acts { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .win .acts .ghost { border-color: transparent; color: var(--muted); }
+  .win .acts .ghost:hover:not(:disabled) { color: var(--ink); border-color: var(--line); }
+
+  /* telas médias: lista + editor lado a lado, janelas embaixo ocupando a largura */
+  @media (max-width: 1399px) {
+    .pgrid { grid-template-columns: 280px minmax(0, 1fr); }
+    .wincard { grid-column: 1 / -1; position: static; height: 560px; }
+  }
+  @media (max-width: 860px) {
+    .pcard { min-height: 0; }
+    .wincard { height: 520px; }
+  }
+
+  /* saúde */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center; }
+  /* serviço em destaque: primeira linha inteira, tudo centralizado */
+  .svc-card { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; padding: 24px 20px; margin-bottom: 20px; }
+  .svc-card h3, .svc-card .hint, .svc-card #svc-out { margin: 0; }
+  .svc-card .svc-badge { align-self: center; }
+  .svc-card #svc-out { text-align: left; max-width: 100%; }
+  #svc-out:empty { display: none; }
+  .svc-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+  .svc-actions .btn { font-size: 16px; padding: 12px 28px; border-radius: 10px; min-width: 140px; }
+  @media (max-width: 640px) { /* os três na mesma linha, dividindo a largura */
+    .svc-actions { width: 100%; flex-wrap: nowrap; gap: 8px; }
+    .svc-actions .btn { flex: 1 1 0; min-width: 0; padding: 12px 8px; }
+  }
+  /* verificações em duas colunas; os dois itens de cada linha têm a mesma altura, então as divisórias se alinham */
+  #checks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+  #checks li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 4px 10px; align-content: start; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  #checks li.empty { grid-column: 1 / -1; }
+  #checks li:last-child, #checks li:nth-child(odd):nth-last-child(2) { border-bottom: 0; }
+  @media (max-width: 1100px) {
+    #checks { grid-template-columns: minmax(0, 1fr); }
+    #checks li:nth-child(odd):nth-last-child(2) { border-bottom: 1px solid var(--line); }
+  }
+  .ico { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; }
+  .ico.ok { background: var(--ok); } .ico.warn { background: var(--warn); } .ico.fail { background: var(--fail); }
+  .cname { font-weight: 600; }
+  .cdetail { grid-column: 2; color: var(--muted); font-size: 13px; word-break: break-word; }
+  .chint { grid-column: 2; font-size: 13px; }
+  /* resumo dos serviços (Serviço, Daemon, Extensão) no card Serviço */
+  .svc-badge { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;
+               padding: 5px 14px 5px 6px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+  .svc-badge .ico { width: 20px; height: 20px; font-size: 12px; }
+  .svc-badge.unknown .ico { background: var(--muted); }
+  .svc-badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 10%, var(--panel)); }
+  .svc-badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 10%, var(--panel)); }
+  .svc-badge.fail { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 40%, transparent); background: color-mix(in srgb, var(--fail) 10%, var(--panel)); }
+  /* Iniciar com o serviço já rodando: chapado, sem borda nem fundo, não parece clicável */
+  button.btn[data-svc]:disabled { opacity: .5; color: var(--muted); background: transparent; border-color: transparent; }
+  #svc-out { white-space: pre-wrap; font: 12px ui-monospace, monospace; color: var(--muted); margin: 12px 0 0; }
+  .summary { font-weight: 600; margin-left: auto; }
+  /* histórico por verificação: um ponto por rodada, o mais novo à direita */
+  .hlegend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: -6px 0 8px; font-size: 12px; color: var(--muted); }
+  .hlegend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.fail { background: var(--fail); }
+  .hchart { grid-column: 2; margin-top: 6px; padding-bottom: 8px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
+            border-radius: 6px; background: color-mix(in srgb, var(--bg) 70%, transparent); }
+  .hchart:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .hchart svg { display: block; }
+  .hchart .guide { stroke: var(--line); stroke-dasharray: 2 4; }
+  .hchart .trace { fill: none; stroke: color-mix(in srgb, var(--muted) 55%, transparent); stroke-width: 1.5; stroke-linejoin: round; }
+  .hchart rect { fill: transparent; }
+  .hchart g:hover rect { fill: color-mix(in srgb, var(--ink) 7%, transparent); }
+  .hchart circle { stroke: var(--panel); stroke-width: 1.5; }
+  .hchart g:hover circle { r: 5; }
+  .hchart .ok circle { fill: var(--ok); } .hchart .warn circle { fill: var(--warn); } .hchart .fail circle { fill: var(--fail); }
+  .hchart .gap line { stroke: var(--muted); stroke-dasharray: 3 3; }
+
+  /* uso */
+  .uperiod { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 16px; }
+  .uperiod .note { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+  .kpi .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .kpi .v { font-size: 26px; font-weight: 650; letter-spacing: -.02em; margin-top: 2px; font-variant-numeric: tabular-nums;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kpi .s { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kpi .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: 2px; }
+  .ugrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 20px; align-items: start; margin-bottom: 20px; }
+  .uprof { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+  .card h3 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: 0; }
+  .card h3 .tot { float: right; text-transform: none; letter-spacing: 0; font-weight: 400; }
+  /* barras horizontais: nome · trilho · valor */
+  .bars { display: grid; grid-template-columns: minmax(70px, max-content) minmax(0, 1fr) max-content; gap: 9px 12px; align-items: center; }
+  .brow { display: contents; }
+  .bname { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+  .bname small { color: var(--muted); font-size: 11px; margin-left: 6px; }
+  .btrack { display: flex; gap: 2px; height: 14px; }
+  .bseg { height: 100%; border-radius: 2px; min-width: 3px; }
+  .bseg:first-child { border-radius: 4px 2px 2px 4px; }
+  .bseg:last-child { border-radius: 2px 4px 4px 2px; }
+  .bseg:only-child { border-radius: 4px; }
+  .bval { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+  .bval b { color: var(--ink); font-weight: 600; }
+  .brow:hover .bname, .brow:hover .bval b { color: var(--accent); }
+  .ulegend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin: -4px 0 12px; }
+  .ulegend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; background: var(--c); vertical-align: -1px; }
+  /* colunas por dia (empilhadas por perfil) */
+  .days { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 170px; padding: 4px 40px 0 0; border-bottom: 1px solid var(--line); }
+  .days .grid { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); pointer-events: none; }
+  .days .grid span { position: absolute; right: 0; top: -8px; font-size: 11px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dcol { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column-reverse; gap: 2px; cursor: default; position: relative; }
+  .dcol:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); border-radius: 4px 4px 0 0; }
+  .dcol i { display: block; width: 100%; max-width: 28px; margin: 0 auto; border-radius: 2px; flex: none; }
+  .dcol i:last-child { border-radius: 4px 4px 2px 2px; }
+  .dcol i:only-child { border-radius: 4px 4px 0 0; }
+  .dcol i:first-child:not(:only-child) { border-radius: 2px 2px 0 0; }
+  .dax { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 6px 40px 0 0; }
+  #utip { position: fixed; z-index: 30; pointer-events: none; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+          border-radius: 8px; box-shadow: var(--shadow); padding: 8px 10px; font-size: 12.5px; max-width: 280px; white-space: pre-line; }
+  #utip b { font-weight: 600; }
+  .uempty { text-align: center; padding: 48px 20px; color: var(--muted); }
+  .uempty b { display: block; color: var(--ink); font-size: 16px; margin-bottom: 6px; }
+
+  /* barra de salvar */
+  /* barra flutuante: centralizada, descolada da borda de baixo; só nas abas que editam a configuração */
+  .savebar { position: fixed; left: 50%; bottom: 56px; transform: translateX(-50%); z-index: 5;
+             display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px 16px;
+             width: max-content; max-width: calc(100% - 32px); padding: 14px 18px;
+             background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+  .savebar .actions { display: flex; gap: 12px; }
+  .savebar .actions .btn { font-size: 16px; padding: 12px 26px; border-radius: 10px; }
+  @media (min-width: 861px) { body:not(.drawer-closed) .savebar { left: calc(50% + 110px); max-width: calc(100% - 252px); } }
+  .savebar { transition: left .18s ease; }
+  @media (max-width: 640px) { .savebar { bottom: 24px; } }
+  #save-msg { font-size: 13px; text-align: center; }
+  #save-msg:empty { display: none; }
+  #save-msg.ok { color: var(--ok); } #save-msg.fail { color: var(--fail); } #save-msg.warn { color: var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <button class="drawer-toggle" id="drawer-toggle" type="button" aria-controls="drawer" aria-expanded="true" title="Mostrar/esconder menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <h1>Macropad 2000</h1>
+  <div class="pills">
+    <span id="pill-daemon" class="pill">daemon</span>
+    <span id="pill-pad" class="pill">macropad</span>
+    <span id="pill-ext" class="pill">extensão</span>
+    <span id="pill-profile" class="pill profile">perfil —</span>
+  </div>
+  <div class="spacer"></div>
+  <button id="mode-badge" class="mode-badge off" type="button" title="Modo do macropad — o botão 6 (ação &quot;Acionar perfil&quot;) alterna. Clique para alternar.">…</button>
+  <label class="switch" title="As teclas aparecem aqui mas não são executadas">
+    <input type="checkbox" id="test-toggle"> Modo teste
+  </label>
+  <button class="drawer-toggle theme-toggle" id="theme-toggle" type="button" title="Alternar tema claro/escuro">
+    <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+    <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+  </button>
+</header>
+<div class="shell">
+<nav class="drawer" id="drawer">
+  <button data-tab="keys" class="active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    Botões
+  </button>
+  <button data-tab="profiles">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="m2 13 10 5 10-5"/><path d="m2 18 10 5 10-5" opacity=".5"/></svg>
+    Perfis
+  </button>
+  <button data-tab="health">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+    Saúde
+  </button>
+  <button data-tab="usage">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+    Uso
+  </button>
+</nav>
+<div class="drawer-scrim" id="drawer-scrim"></div>
+
+<main>
+  <!-- ======================================================= BOTÕES -->
+  <section id="tab-keys">
+    <div class="pagehead"><h2>Botões</h2><p>O que cada controle do macropad faz em cada perfil.</p></div>
+    <div class="layout">
+      <div class="card">
+        <div class="ptabs" id="ptabs"></div>
+        <div class="pad" id="pad">
+          <div class="grid">
+            <button class="key" data-key="F13"><span class="num">1</span><span class="lbl"></span></button>
+            <button class="key" data-key="F14"><span class="num">2</span><span class="lbl"></span></button>
+            <button class="key" data-key="F15"><span class="num">3</span><span class="lbl"></span></button>
+            <button class="key" data-key="F16"><span class="num">4</span><span class="lbl"></span></button>
+            <button class="key" data-key="F17"><span class="num">5</span><span class="lbl"></span></button>
+            <button class="key" data-key="F18"><span class="num">6</span><span class="lbl"></span></button>
+          </div>
+          <div class="knob-area">
+            <button class="knob" data-key="F20"><span class="lbl"></span></button>
+            <div class="turns">
+              <button class="turn" data-key="F19" title="Girar para a esquerda">⟲ <span class="lbl"></span></button>
+              <button class="turn" data-key="F21" title="Girar para a direita">⟳ <span class="lbl"></span></button>
+            </div>
+          </div>
+        </div>
+        <div class="rot-wrap">
+          <button class="rot" id="pad-flip" type="button" aria-pressed="false" title="Girar o desenho 180° (knob à direita ou à esquerda)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
+            </svg>
+            <span>Girar teclado</span>
+          </button>
+          <button class="rot" id="chord-mode" type="button" aria-pressed="false" title="Escolher dois botões para uma combinação — o mesmo que segurar Shift">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3 3 12h5v8h8v-8h5L12 3Z"/>
+            </svg>
+            <span>Combinação</span><kbd>Shift</kbd>
+          </button>
+        </div>
+        <div class="chords" id="chords">
+          <div class="chords-head">
+            <h3>Combinações</h3><span class="sub">dois botões apertados juntos</span>
+          </div>
+          <ul class="chord-list" id="chord-list"></ul>
+          <div class="chord-glob" id="chord-glob" hidden></div>
+          <div class="chord-tray" id="chord-tray"></div>
+        </div>
+        <p class="hint" id="pad-hint"></p>
+        <div class="evrow lastev">
+          <span class="t">Último evento</span>
+          <span id="last-ev"><span class="w" style="color:var(--muted)">aperte algo no macropad…</span></span>
+          <button class="evgo" id="ev-all" type="button" title="Ver a lista de eventos na aba Uso">ver todos →</button>
+        </div>
+      </div>
+
+      <div class="card" id="editor">
+        <h2 id="ed-title">Botão 1</h2>
+        <div class="gtabs" id="ed-gtabs" role="tablist" aria-label="Gesto"></div>
+        <p class="sysnote" id="ed-gnote" hidden></p>
+        <label class="check" id="ed-shared-box" hidden title="Marcada: vale também nos outros perfis (eles podem desligá-la com “Nada”). Desmarcada: só no Global.">
+          <input type="checkbox" id="ed-shared"> Herdar nos outros perfis</label>
+        <label class="f" id="ed-label-box"><span id="ed-label-text">Nome no botão</span>
+          <input id="ed-label" maxlength="24" placeholder="ex.: clear">
+        </label>
+        <label class="f" id="ed-action-box">Ação
+          <select id="ed-action">
+            <option value="inherit">Usar do Global</option>
+            <option value="text">Digitar texto</option>
+            <option value="combo">Atalho de teclado</option>
+            <option value="launch">Abrir aplicativo</option>
+            <option value="url">Abrir site</option>
+            <option value="profile">Acionar perfil</option>
+            <option value="scroll">Rolar a página</option>
+            <option value="none">Nada</option>
+          </select>
+        </label>
+        <label class="f" id="ed-mode-box">Funcionamento
+          <select id="ed-mode"></select>
+        </label>
+        <p class="desc" id="ed-desc"></p>
+        <p class="sysnote" id="ed-sysnote" hidden></p>
+
+        <div id="f-text">
+          <label class="f">Texto
+            <input id="ed-text" class="mono" placeholder="/clear" spellcheck="false">
+          </label>
+          <label class="check"><input type="checkbox" id="ed-enter"> Apertar Enter no final</label>
+          <div class="chips" data-chips="text"></div>
+        </div>
+
+        <div id="f-combo">
+          <label class="f">Atalho
+            <div class="row">
+              <input id="ed-combo" class="mono" placeholder="alt+p" spellcheck="false">
+              <button class="btn" id="capture" type="button">Capturar</button>
+            </div>
+          </label>
+          <p class="esc-hint" id="capture-hint">Esc sozinho cancela a captura — para mapear o Esc, clique em <b>esc</b> abaixo.</p>
+          <div class="carousel" id="combo-car">
+            <button type="button" class="car-arrow" data-step="-1" aria-label="Anteriores">‹</button>
+            <div class="car-view"><div class="car-track" data-chips="combo"></div></div>
+            <button type="button" class="car-arrow" data-step="1" aria-label="Próximos">›</button>
+          </div>
+        </div>
+
+        <div id="f-cycle">
+          <label class="f"><span id="ed-items-label">Atalhos, em ordem, separados por vírgula</span>
+            <input id="ed-items" class="mono" placeholder="ctrl+c, ctrl+v" spellcheck="false">
+          </label>
+          <label class="check" id="ed-items-enter-box"><input type="checkbox" id="ed-items-enter"> Apertar Enter no final de cada texto</label>
+          <div class="chips" data-chips="cycle"></div>
+        </div>
+
+        <div id="f-scroll">
+          <label class="f">Direção e quantidade (cliques da roda)
+            <div class="row">
+              <select id="ed-scroll-dir"><option value="-1">Para cima</option><option value="1">Para baixo</option></select>
+              <input id="ed-scroll-n" type="number" min="1" max="20" value="3">
+            </div>
+          </label>
+        </div>
+
+        <div id="f-launch">
+          <label class="f">Aplicativo
+            <div class="row"><input id="ed-app-filter" placeholder="Filtrar… (ex.: fire)"></div>
+            <div class="row"><select id="ed-app" size="6"></select></div>
+          </label>
+          <label class="check"><input type="checkbox" id="ed-newwin"> Sempre abrir nova janela (senão foca a que já está aberta)</label>
+        </div>
+
+        <div id="f-profile">
+          <label class="f">Perfil
+            <select id="ed-profile"></select>
+          </label>
+        </div>
+
+        <div id="f-url">
+          <label class="f">Endereço
+            <input id="ed-url" class="mono" type="url" placeholder="youtube.com" spellcheck="false">
+          </label>
+          <div class="chips" data-chips="url"></div>
+        </div>
+
+        <button class="btn sm" id="ed-gesture-remove" type="button" hidden>Remover este gesto</button>
+
+        <hr>
+        <label class="f">Layout do teclado (para digitar a "/")
+          <select id="slash">
+            <option value="KEY_RO">ABNT2 (br)</option>
+            <option value="KEY_SLASH">US / internacional</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= PERFIS -->
+  <section id="tab-profiles" hidden>
+    <div class="pagehead"><h2>Perfis</h2><p>Cada perfil troca as ações dos botões conforme a janela em foco. O primeiro que bater ganha.</p></div>
+    <div class="pgrid">
+      <!-- lista, em ordem de prioridade -->
+      <div class="card pcard">
+        <div class="chead"><h3>Prioridade</h3><span class="spacer"></span><button class="btn sm primary" id="p-new">+ Novo</button></div>
+        <ul class="plist" id="plist"></ul>
+        <div class="psep"></div>
+        <ul class="plist" id="plist-fallback"></ul>
+        <p class="cfoot">Arraste <b>⋮⋮</b> ou use ↑ ↓ para mudar a prioridade.</p>
+      </div>
+
+      <!-- editor do perfil selecionado -->
+      <div class="card pcard">
+        <div class="edhead">
+          <div class="info">
+            <input id="p-name" class="pname-in" maxlength="32" aria-label="Nome do perfil" spellcheck="false">
+            <div class="edmeta" id="p-meta"></div>
+          </div>
+          <button class="btn" id="p-edit-keys" type="button">Editar botões →</button>
+        </div>
+        <div class="sec" id="p-rules-box">
+          <h4>Quando ativar</h4>
+          <p class="lead">Ativa se a janela em foco bater com <b>qualquer</b> regra. Dentro de uma regra, todos os campos preenchidos precisam bater.</p>
+          <div class="rtable">
+            <div class="rule rule-head"><span>app (.desktop)</span><span>wm_class</span><span>título contém</span><span>título (regex)</span><span>bate agora?</span><span></span></div>
+            <div id="p-rules"></div>
+          </div>
+          <div class="acts-row">
+            <button class="btn sm" id="p-add-rule">+ Regra</button>
+            <span class="hint">ou use “+ regra” numa janela ao lado. No título, deixe só a parte que não muda.</span>
+          </div>
+        </div>
+        <div class="sec" id="p-fallback-note">
+          <h4>Perfil padrão</h4>
+          <p class="lead" style="margin:0">O Global vale quando nenhum outro perfil bate. Ele não tem regras e não pode ser excluído; os controles que os outros perfis deixam em “Usar do Global” vêm dele.</p>
+        </div>
+        <div class="sec" style="border-bottom:0">
+          <h4>Controles neste perfil</h4>
+          <p class="lead">Itálico = herdado do Global. Clique num controle ou combinação para editá-lo na aba Botões.</p>
+          <div class="minirow"><div class="minipad" id="minipad"></div><div class="legend" id="mini-legend"></div></div>
+          <div class="pchords">
+            <h5>Combinações <span class="sub">dois botões apertados juntos</span></h5>
+            <ul class="chord-list" id="p-chords"></ul>
+            <div class="chord-glob" id="p-chord-glob" hidden></div>
+          </div>
+        </div>
+        <div class="dzone" id="p-dzone"><p>Excluir remove o perfil e todas as regras dele.</p><button class="btn danger" id="p-delete">Excluir perfil</button></div>
+      </div>
+
+      <!-- janelas: em foco fixa no topo, recentes rolando -->
+      <div class="card pcard wincard">
+        <div class="chead"><h3>Janelas</h3><span class="sub" id="win-sub">esta página é ignorada</span></div>
+        <div class="wnow">
+          <p class="wlbl"><span class="dot" id="win-now-dot"></span>Em foco agora</p>
+          <div id="win-now"><p class="empty">Sem informação da extensão do GNOME.</p></div>
+        </div>
+        <div class="wfilter"><input id="win-filter" type="search" placeholder="Filtrar janelas…" spellcheck="false"></div>
+        <p class="wlbl wcount">Recentes <span class="count" id="recents-count">0</span></p>
+        <div class="wscroll" id="recents"><p class="empty">Nenhuma ainda.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= SAÚDE -->
+  <section id="tab-health" hidden>
+    <div class="pagehead"><h2>Saúde</h2><p>Diagnóstico do daemon, do macropad e da extensão do GNOME.</p></div>
+    <!-- serviço em destaque: ocupa a primeira linha inteira, centralizado -->
+    <div class="card svc-card">
+      <h3>Serviço</h3>
+      <span class="svc-badge unknown" id="svc-badge" role="status"><span class="ico">?</span>Verificando…</span>
+      <div class="svc-actions">
+        <button class="btn go" data-svc="start">Iniciar</button>
+        <button class="btn caution" data-svc="restart">Reiniciar</button>
+        <button class="btn danger" data-svc="stop">Parar</button>
+      </div>
+      <p class="hint">O daemon roda como serviço do usuário: <code>macropad-claude</code>.</p>
+      <pre id="svc-out"></pre>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <h3 style="margin:0">Verificações</h3>
+        <span class="summary" id="summary"></span>
+        <button class="btn sm" id="refresh">Verificar de novo</button>
+      </div>
+      <p class="hlegend">
+        <span><span class="dot ok"></span>ok</span><span><span class="dot warn"></span>aviso</span><span><span class="dot fail"></span>falha</span>
+        <span id="h-every"></span><span id="h-last"></span>
+      </p>
+      <ul id="checks"></ul>
+    </div>
+  </section>
+
+  <!-- ======================================================= USO -->
+  <section id="tab-usage" hidden>
+    <div class="pagehead"><h2>Uso</h2><p>O que está chegando agora e quantas vezes cada macro rodou. O daemon só guarda os totais por dia, perfil e botão.</p></div>
+    <!-- fora do #u-body, que é redesenhado a cada 10 s -->
+    <div class="card ulive">
+      <h3>Eventos ao vivo<span class="tot">desde que a página abriu · o período não se aplica</span></h3>
+      <ol id="log"><li class="empty">Aperte algo no macropad…</li></ol>
+    </div>
+    <div class="uperiod" id="u-period">
+      <button class="ptab" data-days="1">Hoje</button>
+      <button class="ptab" data-days="7">7 dias</button>
+      <button class="ptab sel" data-days="30">30 dias</button>
+      <button class="ptab" data-days="90">90 dias</button>
+      <button class="ptab" data-days="0">Tudo</button>
+      <span class="note" id="u-note"></span>
+    </div>
+    <div id="u-body"></div>
+  </section>
+</main>
+<div id="utip" hidden></div>
+<dialog id="test-modal" aria-labelledby="tm-title">
+  <div class="tm-head">
+    <h2 id="tm-title">Modo teste</h2>
+    <span class="tm-count" id="tm-count">0 eventos</span>
+    <p>As teclas aparecem aqui mas <b>não</b> são executadas. Fechar esta janela sai do modo teste.</p>
+  </div>
+  <ol id="test-log"></ol>
+  <div class="tm-foot">
+    <button class="btn" type="button" id="tm-clear">Limpar</button>
+    <button class="btn primary" type="button" id="tm-close">Sair do modo teste</button>
+  </div>
+</dialog>
+</div>
+
+<div class="savebar" id="savebar">
+  <div class="actions">
+    <button class="btn primary" id="save" disabled>Salvar e aplicar</button>
+    <button class="btn" id="revert" disabled>Descartar</button>
+  </div>
+  <span id="save-msg"></span>
+  <button class="btn sm" id="undo-swap" type="button" hidden>Desfazer</button>
+</div>
+
+<script>
+const KEYS = ["F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21"];
+const NAMES = {
+  F13: "Botão 1", F14: "Botão 2", F15: "Botão 3", F16: "Botão 4", F17: "Botão 5", F18: "Botão 6",
+  F19: "Knob: girar para a esquerda", F20: "Knob: apertar", F21: "Knob: girar para a direita",
+};
+// combinações (dois botões juntos): só os botões 1 a 6. Nome "F13+F14", com o botão de número menor primeiro.
+const BUTTON_KEYS = ["F13", "F14", "F15", "F16", "F17", "F18"];
+const isChord = (k) => typeof k === "string" && k.includes("+");
+const chordKeys = (k) => k.split("+");
+const btnNum = (k) => BUTTON_KEYS.indexOf(k) + 1;
+const chordOf = (a, b) => [a, b].sort((x, y) => btnNum(x) - btnNum(y)).join("+");
+const chordSort = (x, y) => { const [a, b] = chordKeys(x).map(btnNum), [c, d] = chordKeys(y).map(btnNum); return a - c || b - d; };
+BUTTON_KEYS.forEach((a, i) => BUTTON_KEYS.slice(i + 1).forEach((b) => { NAMES[`${a}+${b}`] = `Botões ${i + 1} + ${btnNum(b)}`; }));
+// ["o 2", "o 3"] -> "o 2 e o 3"
+const listPt = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} e ${xs[xs.length - 1]}`);
+const DESCS = {
+  inherit: "Usa a mesma ação deste botão no perfil Global.",
+  text: "Digita o texto na janela em foco. Comandos com <code>/</code> só funcionam com a caixa do Claude Code vazia. Aceita letras sem acento, números, espaço, <code>/</code> e <code>-</code>.",
+  combo: "Aperta e solta o atalho uma vez. Também vale <code>super</code> sozinho (visão geral) e teclas de mídia: <code>playpause</code>, <code>volumeup</code>, <code>mute</code>…",
+  launch: "Abre o aplicativo. Se ele já estiver aberto, traz a janela para a frente (como clicar na dock).",
+  url: "Abre o site no navegador padrão, de qualquer janela. Se o navegador já estiver aberto, vira uma aba nova. Sem <code>https://</code>, ele é colocado sozinho.",
+  scroll: "Gira a roda do mouse sobre a janela em foco.",
+  none: "Este gesto não faz nada.",
+};
+// gestos e modos ("Funcionamento"): as combinações válidas vêm do servidor (META, de daemon/gestures.py)
+const GESTURES = ["tap", "long", "double"];
+const GESTURE_NAMES = { tap: "Ao tocar", long: "Ao segurar", double: "Toque duplo" };
+const MODE_NAMES = {
+  once: "Uma vez", toggle: "Interruptor (a próxima ação desliga)", latch: "Trava (só o mesmo gesto desliga)",
+  while_held: "Enquanto apertado", cycle: "Alternar (lista, um item por vez)", switcher: "Alternador de janelas (estilo Alt+Tab)",
+};
+const MODE_DESCS = {
+  "combo.toggle": "Interruptor: o 1º toque segura o atalho; o 2º toque <b>ou qualquer outra ação do macropad</b> solta (antes da outra ação, para não misturar teclas). É o da voz: o Claude Code fica em modo <code>hold</code> e o texto fica na caixa para você revisar.",
+  "combo.latch": "Trava: o 1º toque segura o atalho e só o mesmo gesto solta. As outras ações rodam com ele segurado (ex.: <code>shift</code> travado, como o Caps Lock).",
+  "combo.while_held": "Segura o atalho enquanto o botão estiver apertado; o GNOME repete, como num teclado (ex.: <code>backspace</code>).",
+  "combo.cycle": "Cada vez, aperta o próximo atalho da lista e volta ao início no fim. Atenção: no terminal, <code>ctrl+c</code> interrompe o Claude Code; lá, copiar/colar texto é <code>ctrl+shift+c</code> / <code>ctrl+shift+v</code>.",
+  "combo.switcher": "Para o knob: segura o <b>primeiro modificador</b> (ex.: Alt) enquanto você gira e solta sozinho após uma pausa — como manter o Alt apertado e ir dando Tab. Apertar outra tecla durante a troca só confirma a escolha.",
+  "text.cycle": "Cada vez, digita o próximo texto da lista e volta ao início no fim.",
+  "profile.latch": "Fixa o macropad no perfil escolhido, ignorando a janela em foco (badge amarelo, com cadeado). <b>O mesmo gesto</b> de novo volta ao automático — mesmo que no perfil fixado o botão tenha outra ação. Perfis novos já vêm com o botão 6 acionando o Global.",
+  "profile.toggle": "Perfil por um toque: a <b>próxima ação</b> do macropad roda nesse perfil e ele volta sozinho. O mesmo gesto de novo cancela.",
+};
+const CHIPS = {
+  text: ["/clear", "/usage", "/compact", "/effort", "/model", "/rewind", "/context"],
+  combo: ["esc", "enter", "ctrl+c", "ctrl+v", "ctrl+z", // os 5 mais comuns aparecem primeiro no carrossel
+    "alt+p", "shift+tab", "ctrl+t", "ctrl+w", "ctrl+tab", "home", "super", "playpause", "volumeup", "volumedown", "mute"],
+  cycle: ["ctrl+c, ctrl+v", "ctrl+shift+c, ctrl+shift+v"],
+};
+// site -> nome sugerido para o botão
+const URL_CHIPS = { "youtube.com": "YouTube", "mail.google.com": "Gmail", "calendar.google.com": "Agenda",
+  "web.whatsapp.com": "WhatsApp", "claude.ai": "Claude", "github.com": "GitHub" };
+// "https://www.youtube.com/watch?v=x" -> "youtube"
+function siteName(url) {
+  try { return new URL(/^[a-z]+:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, "").split(".")[0]; }
+  catch { return ""; }
+}
+const SWITCHER_CHIPS = ["alt+tab", "alt+shift+tab", "alt+grave", "alt+shift+grave"];
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid != null) el.append(kid);
+  return el;
+}
+
+let cfg = null, saved = null, selP = 0, sel = "F13", selG = "tap", es = null, capturing = false, META = null;
+let apps = [], appsById = {};
+let live = { profile: null, window: null, recents: [], extension: false, locked: false, lockedProfile: null };
+const SYSNOTE = {};
+// controles com função fixa (não editáveis): label e descrição no lugar da ação do perfil
+const FIXED = {};
+// tecla que, em perfil novo, já vem acionando o Global (fixa / volta ao automático)
+const LOCK_KEY = "F18";
+
+// ------------------------------------------------------------ helpers de config
+const P = () => cfg.profiles[selP];
+const globalP = () => cfg.profiles.find((p) => p.fallback);
+// tecla ou combinação. Combinação que o perfil não tem = "usar do Global", criada só ao escolher uma ação
+const keyOf = (p, k) => (isChord(k) ? (p.chords || {})[k] || { inherit: true, tap: blankGesture(), long: null, double: null } : p.keys[k]);
+const chordMs = () => Number(cfg?.timing?.chord_ms) || META?.chord_ms || 50;
+const realChord = (c) => !!c && !c.inherit && c.tap.action !== "none";
+// combinações do Global que os outros perfis herdam: só as marcadas "Herdar nos outros perfis" (shared)
+const sharedChords = () => Object.fromEntries(Object.entries(globalP().chords || {}).filter(([, c]) => c.shared));
+// combinações que valem no perfil: as próprias e as compartilhadas do Global ("Nada" no perfil desliga
+// a do Global ali)
+function chordRows(p) {
+  const own = p.chords || {}, glob = p.fallback ? {} : sharedChords();
+  return [...new Set([...Object.keys(own), ...Object.keys(glob)])].sort(chordSort).flatMap((k) => {
+    const mine = own[k];
+    if (mine && !mine.inherit) {
+      const off = mine.tap.action === "none" && realChord(glob[k]);
+      return [{ k, s: mine.tap, inherited: false, off, live: mine.tap.action !== "none" }];
+    }
+    return realChord(glob[k]) ? [{ k, s: glob[k].tap, inherited: true, off: false, live: true }] : [];
+  });
+}
+// botões que formam combinação com k neste perfil (o toque de k espera por eles)
+const chordPartners = (p, k) => chordRows(p).filter((r) => r.live && chordKeys(r.k).includes(k)).map((r) => chordKeys(r.k).find((x) => x !== k));
+// descrição de "Usar do Global" e "Nada" quando o selecionado é uma combinação
+function chordDesc(action) {
+  if (!isChord(sel)) return "";
+  if (action === "inherit") return "Usa a combinação como ela está no perfil Global. Para desligá-la só neste perfil, escolha “Nada”.";
+  if (action !== "none") return "";
+  return realChord(sharedChords()[sel]) && !P().fallback
+    ? "A combinação do Global não vale neste perfil: apertar os dois juntos faz a ação de cada botão."
+    : "Combinação sem ação: escolha o que ela faz (sem ação, ela não é gravada).";
+}
+// a combinação selecionada sumiu (outro perfil, removida, descartada): seleciona o 1º botão dela
+function fixChordSel() {
+  if (cfg && isChord(sel) && !chordRows(P()).some((r) => r.k === sel)) { sel = chordKeys(sel)[0]; selG = "tap"; }
+}
+function resolved(p, k) {
+  const key = keyOf(p, k);
+  return key.inherit ? { key: keyOf(globalP(), k), inherited: true } : { key, inherited: false };
+}
+const hasG = (key, g) => !!key[g] && key[g].action !== "none";
+function describe(s) {
+  if (!s) return "nada";
+  const list = (s.items || []).map((x) => x.replace(/\n$/, "↵")).join(" → ");
+  switch (s.action) {
+    case "text": return s.mode === "cycle" ? `digita ${list}` : `digita ${JSON.stringify(s.text)}`;
+    case "combo":
+      if (s.mode === "cycle") return `alterna ${list}`;
+      if (s.mode === "switcher") return `alternador ${s.combo}`;
+      if (s.mode === "toggle") return `interruptor ${s.combo}`;
+      if (s.mode === "latch") return `trava ${s.combo}`;
+      if (s.mode === "while_held") return `segura ${s.combo}`;
+      return `atalho ${s.combo}`;
+    case "scroll": return `rola ${s.amount < 0 ? "↑" : "↓"} ${Math.abs(s.amount)}`;
+    case "launch": return `abre ${appsById[s.app]?.name || s.app || "?"}`;
+    case "url": return `abre ${s.url || "?"}`;
+    case "profile":
+      if (s.mode === "toggle") return `${s.profile || "?"} por um toque`;
+      return `aciona ${s.profile || "?"}`;
+    default: return "nada";
+  }
+}
+// "atalho enter · segurar: Fn · toque duplo: clear"
+function describeKey(key) {
+  const parts = [describe(key.tap)];
+  for (const g of ["long", "double"]) if (hasG(key, g)) parts.push(`${GESTURE_NAMES[g].toLowerCase()}: ${key[g].label || describe(key[g])}`);
+  return parts.join(" · ");
+}
+function labelOf(key) {
+  for (const g of GESTURES) if (hasG(key, g)) return key[g].label || describe(key[g]);
+  return "—";
+}
+const blankGesture = () => ({ label: "", action: "none", mode: "once", text: "", combo: "", items: [], amount: 3, app: "", new_window: false, url: "", profile: "" });
+function blankKey(fallback) {
+  return { inherit: !fallback, tap: blankGesture(), long: null, double: null };
+}
+const isTurn = (k) => (META?.turn_keys || ["F19", "F21"]).includes(k);
+// motivo para um modo não valer neste gesto deste botão ("" = vale)
+function modeBlock(key, g, mode, k) {
+  if (isChord(k)) return META.chord_modes.includes(mode) ? "" : "não vale numa combinação";
+  if (!META.gesture_modes[g].includes(mode)) return "só vale no toque";
+  if (isTurn(k) && !META.turn_modes.includes(mode)) return "girar o knob não aceita";
+  if (g === "tap" && META.tap_needs_alone.includes(mode)) {
+    const other = ["long", "double"].filter((x) => hasG(key, x)).map((x) => `"${GESTURE_NAMES[x]}"`);
+    if (other.length) return `este botão tem ${other.join(" e ")}`;
+  }
+  return "";
+}
+const firstMode = (key, g, action, k) => META.actions[action].find((m) => !modeBlock(key, g, m, k)) || META.actions[action][0];
+function uniqueName(base) {
+  let name = base, n = 2;
+  while (cfg.profiles.some((p) => p.name.toLowerCase() === name.toLowerCase())) name = `${base} ${n++}`;
+  return name;
+}
+
+// ------------------------------------------------------------ carregar / salvar
+async function loadConfig() {
+  const r = await fetch("/api/config");
+  const data = await r.json();
+  if (!r.ok) { msg(data.error || "Erro ao ler config.json", "fail"); return; }
+  META = data.meta; delete data.meta;
+  cfg = data; saved = JSON.stringify(cfg);
+  selP = Math.min(selP, cfg.profiles.length - 1);
+  renderAll(); dirty();
+}
+async function loadApps() {
+  apps = (await (await fetch("/api/apps")).json()).apps;
+  appsById = Object.fromEntries(apps.map((a) => [a.id, a]));
+  if (cfg) renderAll();
+}
+async function save() {
+  readEditor();
+  $("#save").disabled = true;
+  const r = await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) });
+  const data = await r.json();
+  if (data.saved) { saved = JSON.stringify(cfg); dirty(); msg(data.message, data.reloaded ? "ok" : "warn"); }
+  else { msg(data.message || "Erro ao salvar", "fail"); $("#save").disabled = false; }
+}
+function dirty() {
+  const d = JSON.stringify(cfg) !== saved;
+  $("#save").disabled = !d; $("#revert").disabled = !d;
+  if (d) msg("Alterações não salvas", "warn");
+  else if ($("#save-msg").classList.contains("warn")) msg("");
+  return d;
+}
+function msg(text, cls = "") { const m = $("#save-msg"); m.textContent = text; m.className = cls; $("#undo-swap").hidden = true; }
+function changed() { renderPad(); renderChords(); renderProfiles(); dirty(); }
+
+// ------------------------------------------------------------ render: botões
+function renderAll() { fixChordSel(); renderPTabs(); renderPad(); renderChords(); renderEditor(); renderProfiles(); renderLive(); }
+
+function renderPTabs() {
+  const box = $("#ptabs"); box.replaceChildren();
+  cfg.profiles.forEach((p, i) => {
+    box.append(h("button", { class: "ptab" + (i === selP ? " sel" : ""), title: p.fallback ? "Perfil padrão" : "",
+      onclick: () => selectProfile(i) }, p.name || "(sem nome)", p.name === live.profile ? h("span", { class: "live", title: "ativo agora" }) : null));
+  });
+}
+
+function renderPad() {
+  // no modo combinação, o laranja claro marca os botões escolhidos; fora dele, os da combinação selecionada
+  const picking = chordOn(), selPair = isChord(sel) ? chordKeys(sel) : [], pair = picking ? chordPick.keys : selPair;
+  const rows = chordRows(P()).filter((r) => r.live);
+  $("#pad").classList.toggle("chording", picking);
+  for (const el of $$("[data-key]")) {
+    const k = el.dataset.key, { key, inherited } = resolved(P(), k), fx = FIXED[k];
+    el.classList.toggle("sel", !picking && (k === sel || selPair.includes(k)));
+    el.classList.toggle("picked", pair.includes(k));
+    el.classList.toggle("inh", inherited && !fx);
+    el.classList.toggle("multi", hasG(key, "long") || hasG(key, "double"));
+    const lbl = el.querySelector(".lbl");
+    if (lbl) lbl.textContent = fx ? fx.label : labelOf(key);
+    // "· + 2: janela privada" para cada combinação deste botão
+    const withs = rows.filter((r) => chordKeys(r.k).includes(k))
+      .map((r) => ` · + ${btnNum(chordKeys(r.k).find((x) => x !== k))}: ${r.s.label || describe(r.s)}`).join("");
+    el.title = fx ? `${NAMES[k]}: ${fx.desc} (fixo)` : `${NAMES[k]} (${k}): ${describeKey(key)}${inherited ? " — herdado do Global" : ""}${withs}`;
+  }
+}
+
+// o que uma combinação faz, em duas linhas: nome (ou a ação) e a ação quando tem nome
+function chordText({ s }) {
+  if (s.action === "none") return { what: "nada (escolha a ação)", sub: "" };
+  if (!s.label && s.action === "combo" && !s.combo && !(s.items || []).length) return { what: "atalho a definir", sub: "" };
+  return { what: s.label || describe(s), sub: s.label ? describe(s) : "" };
+}
+
+// mini teclado na mesma posição do desenho, com os dois botões da combinação acesos
+function chordMini(k) {
+  const pair = chordKeys(k), flip = $("#pad").classList.contains("flip");
+  const grid = h("span", { class: "ck-grid" }, (flip ? [6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6]).map((n) =>
+    h("span", { class: "ck" + (pair.includes(BUTTON_KEYS[n - 1]) ? " on" : "") }, String(n))));
+  const knob = h("span", { class: "ck-knob" });
+  return h("span", { class: "ckb", "aria-hidden": "true" }, ...(flip ? [grid, knob] : [knob, grid]));
+}
+
+// Combinações de um perfil, em dois grupos: cartões com as do próprio perfil e, separada, uma linha
+// discreta com as do Global que valem (ou foram desligadas) nele. Usado nas abas Botões e Perfis.
+function renderChordGroups(p, list, glob, { onpick, showSel, empty }) {
+  const rows = chordRows(p), own = rows.filter((r) => !r.inherited && !r.off), inh = rows.filter((r) => r.inherited || r.off);
+  list.replaceChildren(...own.map((row) => {
+    const { k } = row, { what, sub } = chordText(row), c = p.chords[k];
+    // no Global, cada combinação diz se os outros perfis a herdam (desmarcada = só no Global)
+    const share = p.fallback ? h("label", { class: "cshare", title: "Marcada: vale também nos outros perfis (eles podem desligá-la com “Nada”). Desmarcada: só no Global." },
+      h("input", { type: "checkbox", checked: !!c.shared, onchange: (ev) => setShared(k, ev.target.checked) }), "Herdar nos outros perfis") : null;
+    return h("li", { class: share ? "with-share" : "" }, h("button", {
+        type: "button", "data-chord": k, class: "chord-card" + (showSel && k === sel ? " sel" : ""),
+        title: `${NAMES[k]}: ${describe(row.s)}`, onclick: () => onpick(k) },
+      chordMini(k), h("span", { class: "what" }, h("b", {}, what), sub ? h("small", {}, sub) : null)), share);
+  }));
+  if (!own.length) list.append(h("li", { class: "empty" }, empty));
+  glob.hidden = !inh.length;
+  glob.replaceChildren(...(inh.length ? [h("span", { class: "cg-lbl" }, "Do Global:"), ...inh.map((r) => {
+    const g = globalP().chords[r.k].tap, [a, b] = chordKeys(r.k).map(btnNum), what = g.label || describe(g);
+    return h("button", {
+        type: "button", "data-chord": r.k, class: "cg" + (showSel && r.k === sel ? " sel" : "") + (r.off ? " off" : ""),
+        title: r.off ? `${NAMES[r.k]}: a do Global (${describe(g)}) está desligada neste perfil`
+                     : `${NAMES[r.k]}: ${describe(g)} — herdada do Global. Clique para desligá-la ou trocá-la só neste perfil.`,
+        onclick: () => onpick(r.k) },
+      h("b", {}, `${a}+${b}`), ` ${what}`, r.off ? " · desligada" : "");
+  })] : []));
+}
+
+// marca/desmarca "Herdar nos outros perfis" numa combinação do Global
+function setShared(k, on) {
+  const c = globalP().chords?.[k];
+  if (!c) return;
+  c.shared = on;
+  fixChordSel(); changed(); renderEditor();
+  msg(`${NAMES[k]}: ${on ? "vale também nos outros perfis" : "só no Global"} — falta salvar.`, "warn");
+}
+
+// aba Botões: clicar numa combinação edita
+function renderChords() {
+  renderChordGroups(P(), $("#chord-list"), $("#chord-glob"), {
+    onpick: (k) => selectKey(k), showSel: true,
+    empty: P().fallback ? "Nenhuma ainda. Ex.: 1 + 2 juntos abrem uma janela privada."
+                        : "Nenhuma só deste perfil. Ex.: 1 + 2 juntos abrem uma janela privada." });
+  renderTray();
+}
+
+// faixa pequena embaixo da lista para criar combinação: vazia, explica o Shift e liga o modo ao ser
+// clicada; no modo combinação, mostra os botões escolhidos
+function renderTray() {
+  const tray = $("#chord-tray"), picking = chordOn();
+  const tile = (k) => h("div", { class: "key picked", title: NAMES[k] }, h("span", { class: "num" }, String(btnNum(k))));
+  const empty = () => h("div", { class: "key empty", "aria-hidden": "true" }, "?");
+  let a = empty(), what, sub, cls;
+  if (picking) {
+    const [x] = chordPick.keys;
+    if (x) a = tile(x);
+    cls = " picking";
+    what = x ? `Botão ${btnNum(x)} + qual?` : "Clique em dois botões do teclado";
+    sub = chordPick.sticky ? "Esc cancela" : "Soltar o Shift cancela";
+  } else {
+    cls = " idle";
+    what = "Nova combinação";
+    sub = "Segure Shift e clique em dois botões (ou clique aqui)";
+  }
+  tray.className = "chord-tray" + cls;
+  tray.replaceChildren(a, h("span", { class: "ct-plus", "aria-hidden": "true" }, "+"), empty(),
+    h("div", { class: "ct-what" }, h("b", {}, what), h("small", {}, sub)));
+  if (!picking) { tray.tabIndex = 0; tray.setAttribute("role", "button"); tray.title = "Escolher dois botões para uma combinação"; }
+  else { tray.removeAttribute("tabindex"); tray.removeAttribute("role"); tray.removeAttribute("title"); }
+}
+
+// ------------------------------------------------------------ modo combinação
+// Segurar Shift (ou ligar "Combinação", um Shift travado) e clicar em dois botões do teclado cria a
+// combinação deles, ou abre a que já existe. Soltar o Shift, Esc ou desligar o botão cancela.
+const chordPick = { shift: false, sticky: false, keys: [] };
+const chordOn = () => chordPick.shift || chordPick.sticky;
+function setChordMode({ shift = chordPick.shift, sticky = chordPick.sticky } = {}) {
+  if (shift === chordPick.shift && sticky === chordPick.sticky) return;
+  Object.assign(chordPick, { shift, sticky });
+  if (!chordOn()) chordPick.keys = [];
+  renderChordMode();
+}
+function renderChordMode() {
+  $("#chord-mode").setAttribute("aria-pressed", String(chordOn()));
+  if (cfg) { renderPad(); renderTray(); }
+}
+function pickKey(k) {
+  const ks = chordPick.keys;
+  chordPick.keys = ks.includes(k) ? ks.filter((x) => x !== k) : [...ks, k];
+  if (chordPick.keys.length < 2) return renderChordMode();
+  const name = chordOf(...chordPick.keys), p = P(), exists = chordRows(p).some((r) => r.k === name);
+  // o modo desliga mesmo com o Shift ainda apertado, para a faixa mostrar a combinação escolhida;
+  // outro Shift+clique começa a próxima
+  Object.assign(chordPick, { shift: false, sticky: false, keys: [] });
+  $("#chord-mode").setAttribute("aria-pressed", "false");
+  if (!exists) (p.chords ||= {})[name] = { inherit: false, shared: false, long: null, double: null, tap: { ...blankGesture(), action: "combo" } };
+  selectKey(name); changed();
+  if (!exists) $("#ed-combo").focus();
+}
+
+function renderEditor() {
+  const key = keyOf(P(), sel), fixed = !!FIXED[sel];
+  if (key.inherit || isTurn(sel) || !key[selG]) selG = "tap";
+  const g = key[selG];
+  $("#ed-title").textContent = `${NAMES[sel]} · ${P().name}`;
+  $("#ed-sysnote").hidden = !SYSNOTE[sel];
+  $("#ed-sysnote").innerHTML = SYSNOTE[sel] || "";
+  renderGTabs(key);
+  const chord = isChord(sel), notes = [];
+  if (chord) notes.push(`Dispara ao apertar os dois botões juntos (até ${chordMs()} ms entre um e outro), no lugar da ação de cada um.`);
+  else {
+    if (!key.inherit && (hasG(key, "long") || hasG(key, "double"))) notes.push("Com “Ao segurar” ou “Toque duplo”, o toque deste botão passa a disparar ao soltar (pequeno atraso).");
+    const partners = BUTTON_KEYS.includes(sel) ? chordPartners(P(), sel) : [];
+    if (partners.length) notes.push(`Este botão faz combinação com ${listPt(partners.map((x) => `o ${btnNum(x)}`))}: o toque dele espera até ${chordMs()} ms pelo outro botão.`);
+  }
+  $("#ed-gnote").hidden = !notes.length;
+  $("#ed-gnote").textContent = notes.join(" ");
+  $("#ed-shared-box").hidden = !(chord && P().fallback && !key.inherit);
+  $("#ed-shared").checked = !!key.shared;
+  $("#ed-label-box").hidden = $("#ed-action-box").hidden = $("#ed-desc").hidden = fixed;
+  $("#ed-label-text").textContent = chord ? "Nome da combinação" : "Nome no botão";
+  $("#ed-label").placeholder = chord ? "ex.: janela privada" : "ex.: clear";
+  const inh = $("#ed-action").querySelector('[value="inherit"]'), globChord = chord && realChord(sharedChords()[sel]);
+  inh.hidden = P().fallback || selG !== "tap" || (chord && !globChord);
+  inh.textContent = chord ? `Usar do Global (${globChord ? (globalP().chords[sel].tap.label || describe(globalP().chords[sel].tap)) : "não tem"})`
+                          : `Usar do Global (${describeKey(keyOf(globalP(), sel))})`;
+  $("#ed-label").value = key.inherit ? "" : g.label;
+  $("#ed-label").disabled = key.inherit;
+  $("#ed-action").value = key.inherit ? "inherit" : g.action;
+  renderModes(key, g, fixed);
+  const enter = g.text.endsWith("\n");
+  $("#ed-text").value = enter ? g.text.slice(0, -1) : g.text;
+  $("#ed-enter").checked = enter;
+  $("#ed-combo").value = g.combo;
+  $("#ed-items").value = g.items.map((x) => (g.action === "text" ? x.replace(/\n$/, "") : x)).join(", ");
+  $("#ed-items-enter").checked = g.action === "text" && g.items.length > 0 && g.items.every((x) => x.endsWith("\n"));
+  $("#ed-scroll-dir").value = g.amount < 0 ? "-1" : "1";
+  $("#ed-scroll-n").value = Math.abs(g.amount) || 3;
+  $("#ed-newwin").checked = !!g.new_window;
+  $("#ed-url").value = g.url || "";
+  $("#ed-profile").replaceChildren(...cfg.profiles.map((p) => h("option", { value: p.name }, p.name + (p.fallback ? " (padrão)" : ""))));
+  $("#ed-profile").value = g.profile || globalP().name;
+  // remover: um gesto extra do botão; uma combinação própria (com a do Global por baixo, "Usar do Global" faz isso)
+  $("#ed-gesture-remove").hidden = chord ? key.inherit || (globChord && !P().fallback) : fixed || key.inherit || selG === "tap";
+  $("#ed-gesture-remove").textContent = chord ? "Remover combinação" : "Remover este gesto";
+  $("#slash").value = cfg.slash_key;
+  renderAppList();
+  showFields(fixed ? null : key.inherit ? "inherit" : g.action, g.mode);
+  stopCapture();
+}
+
+// abas dos gestos: "Ao tocar" sempre; "Ao segurar" e "Toque duplo" só quando adicionados
+function renderGTabs(key) {
+  const box = $("#ed-gtabs");
+  box.hidden = key.inherit || isTurn(sel) || !!FIXED[sel] || isChord(sel);
+  if (box.hidden) return box.replaceChildren();
+  const alone = key.tap.action !== "none" && META.tap_needs_alone.includes(key.tap.mode);
+  box.replaceChildren(...GESTURES.map((g) => {
+    if (g === "tap" || key[g]) {
+      const s = key[g], sum = s.action !== "none" ? (s.label || describe(s)) : "—";
+      return h("button", { type: "button", role: "tab", class: "ptab" + (g === selG ? " sel" : ""), "aria-selected": String(g === selG),
+        onclick: () => { selG = g; renderEditor(); } }, GESTURE_NAMES[g], h("small", {}, sum));
+    }
+    return h("button", { type: "button", class: "ptab add", disabled: alone,
+      title: alone ? `"${MODE_NAMES[key.tap.mode]}" no toque só vale sozinho: troque o funcionamento do toque para adicionar` : "",
+      onclick: () => { key[g] = blankGesture(); selG = g; renderEditor(); changed(); } }, `+ ${GESTURE_NAMES[g]}`);
+  }));
+}
+
+// "Funcionamento": os modos da ação; os que não valem aqui aparecem desabilitados com o motivo
+function renderModes(key, g, fixed) {
+  const modes = key.inherit || fixed ? [] : (META.actions[g.action] || ["once"]);
+  $("#ed-mode-box").hidden = modes.length <= 1;
+  $("#ed-mode").replaceChildren(...modes.map((m) => {
+    const why = modeBlock(key, selG, m, sel);
+    return h("option", { value: m, disabled: !!why && m !== g.mode }, MODE_NAMES[m] + (why ? ` — indisponível: ${why}` : ""));
+  }));
+  $("#ed-mode").value = g.mode;
+}
+
+function curGesture() {
+  const key = keyOf(P(), sel);
+  return key[selG] || key.tap;
+}
+
+function renderAppList() {
+  const s = curGesture(), f = $("#ed-app-filter").value.trim().toLowerCase();
+  const sel_ = $("#ed-app"); sel_.replaceChildren();
+  let list = apps.filter((a) => !f || a.name.toLowerCase().includes(f) || a.id.toLowerCase().includes(f));
+  if (s.app && !appsById[s.app]) sel_.append(h("option", { value: s.app }, `${s.app} (não encontrado)`));
+  for (const a of list) sel_.append(h("option", { value: a.id, title: a.id }, a.name));
+  sel_.value = s.app || "";
+}
+
+function showFields(action, mode) {
+  const cyc = mode === "cycle";
+  $("#f-text").hidden = action !== "text" || cyc;
+  $("#f-combo").hidden = action !== "combo" || cyc;
+  $("#f-cycle").hidden = !cyc || !["combo", "text"].includes(action);
+  $("#ed-items-label").textContent = action === "text" ? "Textos, em ordem, separados por vírgula" : "Atalhos, em ordem, separados por vírgula";
+  $("#ed-items").placeholder = action === "text" ? "/clear, /compact" : "ctrl+c, ctrl+v";
+  $("#ed-items-enter-box").hidden = action !== "text";
+  $('[data-chips="cycle"]').hidden = action !== "combo";
+  $("#f-scroll").hidden = action !== "scroll";
+  $("#f-launch").hidden = action !== "launch";
+  $("#f-url").hidden = action !== "url";
+  $("#f-profile").hidden = action !== "profile";
+  $("#ed-desc").innerHTML = chordDesc(action) || MODE_DESCS[`${action}.${mode}`] || DESCS[action] || "";
+  const chips = $('[data-chips="combo"]'); chips.replaceChildren();
+  for (const v of mode === "switcher" ? SWITCHER_CHIPS : CHIPS.combo) chips.append(chip(v, "#ed-combo"));
+  carGo(0);
+}
+
+// ------------------------------------------------------------ carrossel de atalhos
+// 5 visíveis; com o mouse em cima avança sozinho até o fim; cada clique numa seta anda um
+const CAR_SHOWN = 5;
+let carIdx = 0, carTimer = 0;
+function carGo(i) {
+  const car = $("#combo-car"), track = car.querySelector(".car-track"), items = track.children;
+  const max = Math.max(0, items.length - CAR_SHOWN);
+  carIdx = Math.min(max, Math.max(0, i));
+  const step = items.length ? items[0].getBoundingClientRect().width + 8 : 0;
+  track.style.transform = `translateX(${-carIdx * step}px)`;
+  const [prev, next] = car.querySelectorAll(".car-arrow");
+  prev.disabled = carIdx === 0; next.disabled = carIdx === max;
+  return carIdx < max;
+}
+function carAuto(on) {
+  clearInterval(carTimer); carTimer = 0;
+  if (on && !reduceMotion()) carTimer = setInterval(() => { if (!carGo(carIdx + 1)) carAuto(false); }, 1100);
+}
+$("#combo-car").addEventListener("mouseenter", () => carAuto(true));
+$("#combo-car").addEventListener("mouseleave", () => carAuto(false));
+window.addEventListener("resize", () => carGo(carIdx));
+for (const b of $("#combo-car").querySelectorAll(".car-arrow"))
+  b.addEventListener("click", () => { carAuto(false); carGo(carIdx + Number(b.dataset.step)); });
+
+// trocou a ação: o modo volta ao 1º que vale para ela neste gesto
+function onActionChange() {
+  const key = keyOf(P(), sel), a = $("#ed-action").value;
+  if (a === "inherit") {
+    if (isChord(sel)) { delete P().chords[sel]; fixChordSel(); } else key.inherit = true;
+    selG = "tap"; renderEditor(); changed(); return;
+  }
+  key.inherit = false;
+  if (isChord(sel)) (P().chords ||= {})[sel] = key;  // a herdada vira própria deste perfil
+  const g = key[selG] || (key[selG] = blankGesture());
+  if (g.action !== a) { g.action = a; g.mode = firstMode(key, selG, a, sel); }
+  readEditor();
+  renderEditor();
+}
+
+// trocou o funcionamento: ao entrar/sair do "alternar", o item atual vira a lista (e vice-versa)
+function onModeChange() {
+  const g = curGesture(), prev = g.mode;
+  g.mode = $("#ed-mode").value;
+  const field = g.action === "text" ? "text" : "combo";
+  if (g.mode === "cycle" && prev !== "cycle" && !g.items.length && g[field]) g.items = [g[field]];
+  if (prev === "cycle" && g.mode !== "cycle" && g.items.length && !g[field]) g[field] = g.items[0];
+  renderEditor(); changed();
+}
+
+function readEditor() {
+  if (!cfg) return;
+  const key = keyOf(P(), sel);
+  cfg.slash_key = $("#slash").value;
+  if (key.inherit) { changed(); return; }
+  const s = curGesture();
+  const prevApp = s.app, prevUrl = s.url || "";
+  s.label = $("#ed-label").value.trim();
+  s.text = $("#ed-text").value + ($("#ed-enter").checked ? "\n" : "");
+  s.combo = $("#ed-combo").value.trim().toLowerCase();
+  if (s.mode === "cycle") {
+    const enter = s.action === "text" && $("#ed-items-enter").checked;
+    s.items = $("#ed-items").value.split(",").map((x) => x.trim()).filter(Boolean)
+      .map((x) => (s.action === "combo" ? x.toLowerCase() : x + (enter ? "\n" : "")));
+  }
+  s.amount = Number($("#ed-scroll-dir").value) * Math.max(1, Math.min(20, Number($("#ed-scroll-n").value) || 1));
+  s.new_window = $("#ed-newwin").checked;
+  if (s.action === "launch" && $("#ed-app").value) {
+    s.app = $("#ed-app").value;
+    // nome automático: o do app, se o nome estava vazio ou era o do app anterior
+    const prevName = appsById[prevApp]?.name;
+    if (!s.label || s.label === prevName) { s.label = appsById[s.app]?.name || s.label; $("#ed-label").value = s.label; }
+  }
+  s.url = $("#ed-url").value.trim();
+  if (s.action === "profile") {
+    // nome automático = nome do perfil, enquanto o nome for vazio ou o automático anterior
+    const prev = s.profile;
+    s.profile = $("#ed-profile").value || globalP().name;
+    if (!s.label || s.label === prev) { s.label = s.profile; $("#ed-label").value = s.label; }
+  }
+  if (s.action === "url" && s.url !== prevUrl) {
+    // mesmo esquema do app: nome automático enquanto o nome for vazio ou o automático anterior
+    const auto = (u) => URL_CHIPS[u] || siteName(u);
+    if (!s.label || s.label === auto(prevUrl)) { s.label = auto(s.url); $("#ed-label").value = s.label; }
+  }
+  showFields(s.action, s.mode);
+  renderGTabs(key);
+  changed();
+}
+
+function selectProfile(i) { selP = i; fixChordSel(); renderPTabs(); renderPad(); renderChords(); renderEditor(); renderProfiles(); }
+function selectKey(k, g = null) {
+  if (isChord(k)) g = "tap";  // a combinação guarda a ação no "tap"
+  if (g) selG = g; else if (k !== sel) selG = "tap";
+  if (!isChord(k)) lastKey = k;
+  sel = k; fixChordSel(); renderPad(); renderChords(); renderEditor();
+}
+// botão selecionado antes da combinação: clicar fora do teclado volta para ele
+let lastKey = "F13";
+function chip(v, field, text = v) {
+  return h("button", { type: "button", class: "chip", title: v, onclick: () => { $(field).value = v; readEditor(); } }, text);
+}
+
+// ------------------------------------------------------------ arrastar para trocar botões
+// Arrastar um botão sobre outro troca os dois (com todos os gestos) no perfil selecionado. Um botão
+// herdado do Global vira ação própria ao trocar de lugar: troca o que está desenhado na tela.
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+// mola amortecida amostrada como easing linear(): passa um pouco do lugar e assenta (o "snap")
+const SPRING = (() => {
+  const z = 0.62, w = 10, wd = w * Math.sqrt(1 - z * z), pts = [];
+  for (let i = 0; i <= 48; i++) {
+    const t = i / 48;
+    pts.push((1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t))).toFixed(4));
+  }
+  pts[pts.length - 1] = "1";
+  const lin = `linear(${pts.join(", ")})`;
+  return CSS.supports("animation-timing-function", lin) ? lin : "cubic-bezier(.3, 1.45, .5, 1)";
+})();
+const SPRING_MS = 440;
+const padGrid = () => $(".pad .grid");
+const keyEl = (k) => $(`.pad .key[data-key="${k}"]`);
+let swapUndo = null;  // { cfg, p, a, b }: estado de antes da última troca, para o "Desfazer"
+
+function swapKeys(a, b) {
+  const p = P(), before = JSON.stringify(cfg);
+  const inh = [a, b].filter((k) => keyOf(p, k).inherit);
+  const own = (k) => (keyOf(p, k).inherit ? { ...structuredClone(keyOf(globalP(), k)), inherit: false } : keyOf(p, k));
+  const ka = own(a), kb = own(b);
+  p.keys[a] = kb; p.keys[b] = ka;
+  const chords = swapChords(p, a, b);
+  sel = b; selG = "tap";  // a seleção vai junto com o botão arrastado
+  changed(); renderEditor();
+  const note = inh.length ? ` ${inh.map((k) => NAMES[k]).join(" e ")} ${inh.length > 1 ? "vinham" : "vinha"} do Global e agora é ação própria deste perfil.` : "";
+  msg(`${NAMES[a]} ⇄ ${NAMES[b]} em “${p.name}” — falta salvar.${note}${chords ? " As combinações deles foram junto." : ""}`, "warn");
+  swapUndo = { cfg: before, p: selP, a, b };
+  $("#undo-swap").hidden = false;
+}
+
+// As combinações seguem os botões trocados (1+2 com 1⇄4 vira 4+2). Como nos botões, as herdadas do
+// Global que mudam de par viram próprias deste perfil, e o par antigo do Global fica desligado aqui.
+function swapChords(p, a, b) {
+  const perm = (k) => chordOf(...chordKeys(k).map((x) => (x === a ? b : x === b ? a : x)));
+  const own = p.chords || {}, glob = p.fallback ? {} : sharedChords();
+  const base = (k) => (realChord(glob[k]) ? glob[k] : null);
+  const eff = {};  // o que vale hoje em cada par
+  for (const k of Object.keys(glob)) if (base(k)) eff[k] = glob[k];
+  for (const [k, c] of Object.entries(own)) {
+    if (c.inherit) continue;
+    if (c.tap.action === "none" && base(k)) delete eff[k]; else eff[k] = c;
+  }
+  if (!Object.keys(eff).some((k) => chordKeys(k).some((x) => x === a || x === b))) return false;
+  const moved = Object.fromEntries(Object.entries(eff).map(([k, c]) => [perm(k), c]));
+  const out = {};
+  for (const k of [...new Set([...Object.keys(own), ...Object.keys(glob), ...Object.keys(moved)])].sort(chordSort)) {
+    const want = moved[k];
+    if (want && want === base(k)) continue;  // a mesma do Global no mesmo par: continua herdando
+    if (!want) { if (base(k)) out[k] = { inherit: false, long: null, double: null, tap: blankGesture() }; continue; }
+    out[k] = Object.values(glob).includes(want) ? { ...structuredClone(want), inherit: false, shared: false } : want;
+  }
+  p.chords = out;
+  return true;
+}
+
+function undoSwap() {
+  if (!swapUndo || drag.el || drag.busy) return;
+  const { cfg: snap, p, a, b } = swapUndo;
+  swapUndo = null;
+  const same = selP === p, ra = keyEl(a).getBoundingClientRect(), rb = keyEl(b).getBoundingClientRect();
+  cfg = JSON.parse(snap); selP = Math.min(p, cfg.profiles.length - 1); sel = a; selG = "tap";
+  renderAll(); dirty();
+  if (same) flyBoth(keyEl(a), rb, keyEl(b), ra);
+}
+
+// FLIP: cada botão sai de onde o conteúdo dele estava (from) e assenta no lugar novo com a mola
+function flipFrom(el, from, top = false) {
+  const to = el.getBoundingClientRect();
+  if (reduceMotion() || !el.animate) return Promise.resolve();
+  const dx = from.left + from.width / 2 - (to.left + to.width / 2), dy = from.top + from.height / 2 - (to.top + to.height / 2);
+  el.classList.add("flying"); el.classList.toggle("top", top);
+  const anim = el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${from.width / to.width})` }, { transform: "none" }],
+                          { duration: SPRING_MS, easing: SPRING });
+  return anim.finished.catch(() => {}).then(() => el.classList.remove("flying", "top"));
+}
+function flyBoth(elA, fromA, elB, fromB) {
+  drag.busy = true;
+  for (const x of [elA, elB]) x.classList.add("no-anim");
+  return Promise.all([flipFrom(elA, fromA, true), flipFrom(elB, fromB)]).then(() => {
+    for (const x of [elA, elB]) x.classList.remove("no-anim");
+    padGrid().classList.remove("dnd", "armed");
+    drag.busy = false;
+  });
+}
+
+const drag = { el: null, busy: false };
+let eatClick = false;
+
+function measureSlots() {
+  drag.slots = $$(".pad .key").map((el) => {
+    const r = el.getBoundingClientRect(), x = r.left + scrollX, y = r.top + scrollY;  // coordenadas da página
+    return { el, x, y, cx: x + r.width / 2, cy: y + r.height / 2 };
+  });
+  drag.origin = drag.slots.find((s) => s.el === drag.el);
+}
+
+function startDrag() {
+  const el = drag.el, r = el.getBoundingClientRect();
+  drag.active = true;
+  drag.ox = drag.x0 - r.left; drag.oy = drag.y0 - r.top;  // onde o botão foi pego
+  drag.w = r.width; drag.target = null;
+  measureSlots();
+  const g = el.cloneNode(true);
+  g.removeAttribute("data-key"); g.removeAttribute("title");
+  g.classList.remove("hit", "holding", "drag-origin"); g.classList.add("drag-ghost");
+  g.setAttribute("aria-hidden", "true"); g.tabIndex = -1;
+  Object.assign(g.style, { width: `${r.width}px`, height: `${r.height}px`, transformOrigin: `${drag.ox}px ${drag.oy}px`,
+                           transform: `translate(${r.left}px, ${r.top}px)` });
+  document.body.append(g);
+  drag.ghost = g;
+  drag.cur = { x: r.left, y: r.top, s: 1, rot: 0 };
+  el.classList.add("drag-origin");
+  padGrid().classList.add("dnd");
+  document.body.classList.add("key-dragging");
+  window.addEventListener("keydown", onDragKey, true);
+  window.addEventListener("scroll", pickTarget, { passive: true, capture: true });
+  drag.raf = requestAnimationFrame(tick);
+}
+
+// alvo = botão mais perto do centro do fantasma, dentro de um raio que cobre o vão entre eles
+function pickTarget() {
+  if (!drag.active) return;
+  const gx = drag.px - drag.ox + drag.w / 2 + scrollX, gy = drag.py - drag.oy + drag.w / 2 + scrollY, R = drag.w * 0.72;
+  const dist = (s) => Math.hypot(gx - s.cx, gy - s.cy);
+  let best = null, bd = Infinity;
+  for (const s of drag.slots) if (s.el !== drag.el && dist(s) < bd) { bd = dist(s); best = s; }
+  let t = bd < R ? best : null;
+  const cur = drag.target;  // histerese: o alvo atual só perde para outro bem mais perto
+  if (cur && t !== cur && dist(cur) < R * 1.12 && (!t || dist(cur) - bd < 12)) t = cur;
+  if (t === cur) return;
+  cur?.el.classList.remove("swap-target");
+  drag.target = t;
+  padGrid().classList.toggle("armed", !!t);
+  if (t) {  // o alvo já se inclina na direção do buraco, mostrando para onde vai
+    t.el.style.setProperty("--tx", `${(drag.origin.cx - t.cx) * 0.28}px`);
+    t.el.style.setProperty("--ty", `${(drag.origin.cy - t.cy) * 0.28}px`);
+    t.el.classList.add("swap-target");
+  }
+}
+
+// o fantasma segue o ponteiro com um pouco de inércia e, perto de um alvo, é puxado para o lugar dele (ímã)
+function tick() {
+  if (!drag.active) return;
+  const c = drag.cur, t = drag.target, still = reduceMotion();
+  let x = drag.px - drag.ox, y = drag.py - drag.oy;
+  if (t) { x += (t.x - scrollX - x) * 0.6; y += (t.y - scrollY - y) * 0.6; }
+  const a = still ? 1 : t ? 0.28 : 0.5, vx = (x - c.x) * a;
+  c.x += vx; c.y += (y - c.y) * a;
+  c.s += ((still ? 1 : t ? 1.01 : 1.07) - c.s) * 0.25;
+  c.rot += ((still || t ? 0 : Math.max(-7, Math.min(7, vx * 0.45))) - c.rot) * 0.2;
+  drag.ghost.style.transform = `translate(${c.x}px, ${c.y}px) rotate(${c.rot}deg) scale(${c.s})`;
+  drag.ghost.classList.toggle("snapped", !!t);
+  drag.raf = requestAnimationFrame(tick);
+}
+
+function endDrag(commit) {
+  cancelAnimationFrame(drag.raf);
+  window.removeEventListener("keydown", onDragKey, true);
+  window.removeEventListener("scroll", pickTarget, { capture: true });
+  document.body.classList.remove("key-dragging");
+  const { el: src, ghost, target } = drag, gr = ghost.getBoundingClientRect();
+  drag.el = null; drag.active = false;
+  if (commit && target) {
+    const dst = target.el, dr = dst.getBoundingClientRect();  // com a inclinação de prévia
+    for (const x of [src, dst]) { x.classList.add("no-anim"); x.classList.remove("drag-origin", "swap-target"); }
+    swapKeys(src.dataset.key, dst.dataset.key);
+    ghost.remove();
+    flyBoth(dst, gr, src, dr);  // o arrastado pousa no alvo; o alvo voa para o buraco
+    return;
+  }
+  // soltou fora: o alvo volta ao lugar e o fantasma volta para o buraco
+  target?.el.classList.remove("swap-target");
+  padGrid().classList.remove("armed");
+  const back = () => { ghost.remove(); src.classList.remove("drag-origin"); padGrid().classList.remove("dnd"); drag.busy = false; };
+  if (reduceMotion() || !ghost.animate) return back();
+  drag.busy = true;
+  const sr = src.getBoundingClientRect();
+  ghost.animate([{ transform: ghost.style.transform }, { transform: `translate(${sr.left}px, ${sr.top}px) rotate(0deg) scale(1)` }],
+                { duration: SPRING_MS, easing: SPRING, fill: "forwards" }).finished.catch(() => {}).then(back);
+}
+
+function onDragKey(ev) {
+  if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); endDrag(false); }
+}
+
+for (const el of $$(".pad .key")) {
+  el.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0 || !cfg || drag.el || drag.busy || chordOn() || ev.shiftKey) return;  // no modo combinação, clicar escolhe
+    Object.assign(drag, { el, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, px: ev.clientX, py: ev.clientY, active: false });
+    el.setPointerCapture(ev.pointerId);
+  });
+  el.addEventListener("pointermove", (ev) => {
+    if (drag.el !== el || ev.pointerId !== drag.id) return;
+    drag.px = ev.clientX; drag.py = ev.clientY;
+    if (!drag.active) {
+      if (Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) < 6) return;  // menos que isso é clique
+      startDrag();
+    }
+    pickTarget();
+  });
+  const finish = (ev) => {
+    if (drag.el !== el || ev.pointerId !== drag.id) return;
+    if (!drag.active) { drag.el = null; return; }  // foi só um clique: seleciona normalmente
+    if (ev.type === "pointerup") { eatClick = true; setTimeout(() => { eatClick = false; }, 0); }
+    endDrag(ev.type === "pointerup");
+  };
+  el.addEventListener("pointerup", finish);
+  el.addEventListener("pointercancel", finish);
+  el.addEventListener("lostpointercapture", finish);
+}
+// o clique que o navegador dispara ao soltar um arrasto não seleciona nada
+document.addEventListener("click", (ev) => { if (eatClick) { eatClick = false; ev.stopPropagation(); ev.preventDefault(); } }, true);
+$("#undo-swap").addEventListener("click", undoSwap);
+
+// ------------------------------------------------------------ render: perfis
+const ownCount = (p) => KEYS.filter((k) => !keyOf(p, k).inherit).length;
+let dragFrom = null;
+
+function profileItem(p, i, movable) {
+  const rules = p.match.length, own = ownCount(p);
+  const isLive = p.name === live.profile;
+  const sub = [isLive ? h("span", { class: "live" }, h("span", { class: "dot" }), "ativo") : null,
+    p.fallback ? "quando nada bate" : `${rules} ${rules === 1 ? "regra" : "regras"} · ${own} ${own === 1 ? "próprio" : "próprios"}`];
+  const li = h("li", { class: i === selP ? "sel" : "", tabindex: "0", draggable: p.fallback ? null : "true",
+      onclick: () => selectProfile(i),
+      onkeydown: (ev) => {
+        if (ev.target !== li) return;
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectProfile(i); }
+        else if (!p.fallback && ev.key === "ArrowUp" && i > 0) { ev.preventDefault(); moveTo(i, i - 1, true); }
+        else if (!p.fallback && ev.key === "ArrowDown" && i < movable - 1) { ev.preventDefault(); moveTo(i, i + 1, true); }
+      } },
+    h("span", { class: "grip", "aria-hidden": "true" }, p.fallback ? "" : "⋮⋮"),
+    h("span", { class: "prio" }, p.fallback ? "—" : String(i + 1)),
+    h("span", { class: "pname", title: p.fallback ? "Vale quando nenhum outro perfil bate; base da herança" : `${own} de ${KEYS.length} controles com ação própria` },
+      h("b", {}, p.name || "(sem nome)"), h("small", {}, sub)),
+    p.fallback ? h("span", { class: "tag" }, "padrão") : h("span", { class: "mv" },
+      h("button", { class: "btn sm", title: "Subir prioridade", tabindex: "-1", disabled: i === 0, onclick: (ev) => { ev.stopPropagation(); moveTo(i, i - 1); } }, "↑"),
+      h("button", { class: "btn sm", title: "Descer prioridade", tabindex: "-1", disabled: i >= movable - 1, onclick: (ev) => { ev.stopPropagation(); moveTo(i, i + 1); } }, "↓")));
+  if (!p.fallback) {
+    const clear = () => li.classList.remove("drop-before", "drop-after");
+    const after = (ev) => { const r = li.getBoundingClientRect(); return ev.clientY - r.top > r.height / 2; };
+    li.addEventListener("dragstart", (ev) => { dragFrom = i; ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", String(i)); li.classList.add("dragging"); });
+    li.addEventListener("dragend", () => { dragFrom = null; $$(".plist li").forEach((x) => x.classList.remove("dragging", "drop-before", "drop-after")); });
+    li.addEventListener("dragover", (ev) => {
+      if (dragFrom === null) return;
+      ev.preventDefault(); const a = after(ev);
+      li.classList.toggle("drop-after", a); li.classList.toggle("drop-before", !a);
+    });
+    li.addEventListener("dragleave", clear);
+    li.addEventListener("drop", (ev) => {
+      ev.preventDefault(); clear();
+      if (dragFrom === null) return;
+      let to = i + (after(ev) ? 1 : 0);
+      if (dragFrom < to) to--;
+      moveTo(dragFrom, to);
+    });
+  }
+  return li;
+}
+
+function renderProfiles() {
+  const movable = cfg.profiles.filter((p) => !p.fallback).length;
+  const items = cfg.profiles.map((p, i) => profileItem(p, i, movable));
+  $("#plist").replaceChildren(...items.filter((_, i) => !cfg.profiles[i].fallback));
+  $("#plist-fallback").replaceChildren(...items.filter((_, i) => cfg.profiles[i].fallback));
+
+  const p = P(), own = ownCount(p);
+  if (document.activeElement !== $("#p-name")) $("#p-name").value = p.name;
+  $("#p-name").disabled = p.fallback;
+  $("#p-rules-box").hidden = p.fallback;
+  $("#p-fallback-note").hidden = !p.fallback;
+  $("#p-dzone").hidden = p.fallback;
+  $("#p-meta").replaceChildren(...[
+    p.name === live.profile ? h("span", { class: "tag ok" }, "● ativo agora") : null,
+    h("span", {}, p.fallback ? "Perfil padrão" : `Prioridade ${selP + 1} de ${movable}`),
+    p.fallback ? null : h("span", {}, `${own} ${own === 1 ? "controle próprio" : "controles próprios"}, ${KEYS.length - own} herdados do Global`),
+  ].filter(Boolean));
+
+  const box = $("#p-rules");
+  if (!box.contains(document.activeElement)) {
+    box.replaceChildren();
+    p.match.forEach((r, ri) => {
+      const inp = (f, ph, label) => h("input", { value: r[f] || "", placeholder: ph, spellcheck: "false", "aria-label": label,
+        oninput: (ev) => { r[f] = ev.target.value; dirty(); renderRecents(); } });
+      box.append(h("div", { class: "rule" },
+        inp("app", "qualquer", "app (.desktop)"), inp("wm_class", "qualquer", "wm_class"), inp("title", "qualquer", "título contém"), inp("title_regex", "qualquer", "título (regex)"),
+        h("span", { class: "m" }),
+        h("button", { class: "btn sm x", title: "Remover regra", onclick: () => { p.match.splice(ri, 1); changed(); } }, "✕")));
+    });
+    if (!p.match.length) box.append(h("p", { class: "empty" }, "Sem regras: este perfil nunca ativa sozinho."));
+  }
+  renderMiniPad();
+  renderRecents();
+}
+
+function renderMiniPad() {
+  const p = P(), flip = $("#pad").classList.contains("flip");
+  const ctl = (k, cls, num) => {
+    const { key, inherited } = resolved(p, k), fx = FIXED[k];
+    return h("button", { type: "button", class: cls + (inherited && !fx ? " inh" : ""),
+        title: fx ? `${NAMES[k]}: ${fx.desc} (fixo)` : `${NAMES[k]}: ${describeKey(key)}${inherited ? " — herdado do Global" : ""}`,
+        onclick: () => { sel = k; showTab("keys"); renderPad(); renderEditor(); } },
+      num ? h("span", { class: "num" }, String(num)) : null, h("span", { class: "lbl" }, fx ? fx.label : labelOf(key)));
+  };
+  const order = flip ? [6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6];
+  const grid = h("div", { class: "mgrid" }, order.map((n) => ctl(`F${12 + n}`, "mk", n)));
+  const knob = ctl("F20", "mknob");
+  $("#minipad").replaceChildren(...(flip ? [grid, knob] : [knob, grid]));
+  const turn = (k, arrow) => {
+    const { key, inherited } = resolved(p, k);
+    return h("span", {}, `Knob ${arrow} `, h("span", { class: inherited ? "inh" : "" }, labelOf(key)));
+  };
+  $("#mini-legend").replaceChildren(turn("F19", "⟲"), turn("F21", "⟳"));
+  // combinações do perfil; clicar abre na aba Botões
+  renderChordGroups(p, $("#p-chords"), $("#p-chord-glob"), {
+    onpick: (k) => { showTab("keys"); selectKey(k); }, showSel: false,
+    empty: "Nenhuma. Na aba Botões, segure Shift e clique em dois botões." });
+}
+
+function moveTo(from, to, keepFocus = false) {
+  if (from === to || from == null) return;
+  const selObj = P(), [p] = cfg.profiles.splice(from, 1);
+  cfg.profiles.splice(to, 0, p);
+  selP = cfg.profiles.indexOf(selObj);
+  renderPTabs(); changed();
+  if (keepFocus) $("#plist").children[to]?.focus();
+}
+
+function newProfile(name, rule) {
+  const keys = Object.fromEntries(KEYS.map((k) => [k, blankKey(false)]));
+  keys[LOCK_KEY] = { inherit: false, long: null, double: null,
+    tap: { ...blankGesture(), action: "profile", mode: "latch", profile: globalP().name, label: globalP().name } };
+  const p = { name: uniqueName(name), fallback: false, match: rule ? [rule] : [], keys, chords: {} };
+  const gi = cfg.profiles.findIndex((x) => x.fallback);
+  cfg.profiles.splice(gi, 0, p);  // entra antes do Global, com a menor prioridade
+  selectProfile(gi); changed();
+  msg(`Perfil "${p.name}" criado — configure os botões na aba Botões e salve.`, "warn");
+}
+
+function addRule(rule) {
+  if (P().fallback) return;
+  P().match.push({ app: "", wm_class: "", title: "", title_regex: "", ...rule });
+  renderProfiles(); dirty();
+}
+
+// ------------------------------------------------------------ render: janelas
+function ago(t) {
+  const s = Math.max(0, Math.round(Date.now() / 1000 - t));
+  return s < 60 ? `há ${s}s` : s < 3600 ? `há ${Math.round(s / 60)} min` : `há ${Math.round(s / 3600)} h`;
+}
+const FIELDS = ["app", "wm_class", "title", "title_regex"];
+function ruleOk(r, win) {
+  // mesma lógica do daemon: todos os campos preenchidos batem; título é "contém"; regex é busca no título; regra vazia nunca bate
+  const fs = FIELDS.filter((f) => (r[f] || "").trim());
+  return fs.length > 0 && fs.every((f) => {
+    if (f === "title_regex") {
+      try { return new RegExp(r[f].trim(), "iu").test(win.title || ""); } catch { return false; }
+    }
+    const v = (win[f] || "").toLowerCase(), want = r[f].trim().toLowerCase();
+    return f === "title" ? v.includes(want) : v === want;
+  });
+}
+function matchingProfile(win) {
+  // qual perfil a janela ativaria com as regras ainda não salvas
+  for (const p of cfg.profiles) if (!p.fallback && p.match.some((r) => ruleOk(r, win))) return p.name;
+  return globalP().name;
+}
+const winName = (w) => w.app_name || w.wm_class || "(sem app)";
+function ruleStatus(r) {
+  if (!FIELDS.some((f) => (r[f] || "").trim())) return ["", "regra vazia"];
+  if (live.window && ruleOk(r, live.window)) return ["ok", `● ${winName(live.window)} (em foco)`];
+  const rec = live.recents.find((w) => ruleOk(r, w));
+  return rec ? ["rec", `recente: ${winName(rec)}`] : ["", "— nenhuma"];
+}
+function renderRuleStatus() {
+  if (!cfg || P().fallback) return;
+  $$("#p-rules .rule").forEach((row, i) => {
+    const r = P().match[i], m = row.querySelector(".m");
+    if (!r || !m) return;
+    const [cls, text] = ruleStatus(r);
+    m.className = "m " + cls; m.textContent = text; m.title = text;
+  });
+}
+function avatarColor(name) {
+  let n = 0; for (const c of name) n = (n * 31 + c.codePointAt(0)) % 360;
+  return `hsl(${n} 45% 45%)`;
+}
+const winKey = (w) => `${w.app}|${w.wm_class}|${w.title}`;
+let openWin = null;  // janela recente expandida (mostra as ações)
+
+function winCard(w, { current = false } = {}) {
+  const canRule = !P().fallback, title = w.title || "", name = winName(w);
+  const target = matchingProfile(w), open = current || winKey(w) === openWin;
+  const toggle = () => { openWin = open ? null : winKey(w); renderRecents(); };
+  const acts = open ? h("div", { class: "acts" },
+    h("button", { class: "btn sm" + (current ? " primary" : ""), disabled: !canRule || !w.app,
+      title: canRule ? `Adicionar regra (só o app) ao perfil "${P().name}"` : "Selecione um perfil que não seja o Global",
+      onclick: () => addRule({ app: w.app }) }, "+ regra: app"),
+    h("button", { class: "btn sm", disabled: !canRule || !title,
+      title: canRule ? `Adicionar regra (app + título) ao perfil "${P().name}". Depois deixe só a parte do título que não muda.` : "Selecione um perfil que não seja o Global",
+      onclick: () => addRule({ app: w.app || "", title: title.replace(/^[^\p{L}\p{N}]+/u, "") }) }, "+ app + título"),
+    h("button", { class: "btn sm ghost", disabled: !title, onclick: () => navigator.clipboard.writeText(title).then(() => msg("Título copiado.", "ok")) }, "Copiar título"),
+    h("button", { class: "btn sm ghost", disabled: !w.app, onclick: () => newProfile(w.app_name || w.wm_class || "Novo perfil", { app: w.app, wm_class: "", title: "", title_regex: "" }) }, "Novo perfil daqui")) : null;
+  return h("div", {
+      class: "win" + (current ? " current" : "") + (open ? " open" : ""),
+      role: current ? null : "button", tabindex: current ? null : "0", "aria-expanded": current ? null : String(open),
+      title: current ? null : (open ? "" : "Clique para ver as ações"),
+      onclick: (ev) => { if (!current && !ev.target.closest(".acts")) toggle(); },
+      onkeydown: (ev) => { if (!current && ev.target === ev.currentTarget && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); toggle(); } } },
+    h("span", { class: "av", style: `background:${avatarColor(name)}`, "aria-hidden": "true" }, name.replace(/^\W+/u, "").charAt(0).toUpperCase() || "?"),
+    h("div", { class: "top" }, h("span", { class: "app" }, name),
+      h("span", { class: "to" + (target === globalP().name ? " g" : ""), title: "Perfil que esta janela ativa (com as regras atuais)" }, `→ ${target}`),
+      w.time ? h("span", { class: "ago" }, current ? "agora" : ago(w.time)) : null),
+    h("div", { class: "title", title }, title ? `“${title}”` : "(sem título)"),
+    h("div", { class: "meta", title: `app: ${w.app || "—"} · wm_class: ${w.wm_class || "—"}` }, `${w.app || "—"} · ${w.wm_class || "—"}`),
+    acts);
+}
+function renderRecents() {
+  if (!cfg) return;
+  const f = $("#win-filter").value.trim().toLowerCase();
+  const list = live.recents.filter((w) => !f || [w.app_name, w.wm_class, w.app, w.title].some((v) => (v || "").toLowerCase().includes(f)));
+  const box = $("#recents"), top = box.scrollTop;
+  box.replaceChildren();
+  if (!live.recents.length) box.append(h("p", { class: "empty" }, live.extension ? "Nenhuma ainda — clique em outra janela." : "A extensão do GNOME não está conectada (veja a aba Saúde)."));
+  else if (!list.length) box.append(h("p", { class: "empty" }, "Nenhuma janela bate com o filtro."));
+  for (const w of list) box.append(winCard(w));
+  box.scrollTop = top;
+  $("#recents-count").textContent = f ? `${list.length} de ${live.recents.length}` : String(live.recents.length);
+  $("#win-sub").textContent = P().fallback ? "esta página é ignorada" : `regras vão para “${P().name}”`;
+  const now = $("#win-now"); now.replaceChildren();
+  const hasNow = live.window && (live.window.app || live.window.title);
+  $("#win-now-dot").style.background = hasNow ? "" : "var(--muted)";
+  if (hasNow) now.append(winCard(live.window, { current: true }));
+  else now.append(h("p", { class: "empty" }, live.extension ? "Nenhuma janela em foco." : "Sem informação da extensão do GNOME."));
+  renderRuleStatus();
+}
+
+// ------------------------------------------------------------ captura de atalho
+const CODE_NAMES = { Space: "space", Enter: "enter", Escape: "esc", Tab: "tab", Backspace: "backspace", Delete: "delete",
+  ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", Home: "home", End: "end",
+  PageUp: "pageup", PageDown: "pagedown", Minus: "minus", Backquote: "grave" };
+function codeToKey(code) {
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3).toLowerCase();
+  if (/^Digit\d$/.test(code)) return code.slice(5);
+  if (/^F\d{1,2}$/.test(code)) return code.toLowerCase();
+  return CODE_NAMES[code] || null;
+}
+function onCaptureKey(ev) {
+  if (["Control", "Alt", "Shift", "Meta", "AltGraph"].includes(ev.key)) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const mods = [ev.ctrlKey && "ctrl", ev.altKey && "alt", ev.shiftKey && "shift", ev.metaKey && "super"].filter(Boolean);
+  if (ev.code === "Escape" && !mods.length) { stopCapture(); return; } // igual à extensão: Esc sozinho cancela
+  const key = codeToKey(ev.code);
+  if (!key) { msg(`Tecla não suportada: ${ev.code}`, "fail"); return; }
+  $("#ed-combo").value = [...mods, key].join("+");
+  stopCapture(); readEditor();
+}
+// Pela extensão do GNOME (grab modal do Shell): pega também os atalhos do sistema, como
+// Ctrl+Alt+T, que nunca chegam ao navegador. Sem extensão, cai na captura pelo navegador.
+let captureSeq = 0;
+async function startCapture() {
+  const seq = ++captureSeq;
+  capturing = true; $("#capture").textContent = "Aperte o atalho…"; $("#capture").classList.add("capturing");
+  $("#capture-hint").classList.add("on");
+  let r;
+  try {
+    r = await (await fetch("/api/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json();
+  } catch { r = { ok: false, error: "daemon" }; }
+  if (seq !== captureSeq || !capturing) return;
+  if (r.ok) {
+    $("#ed-combo").value = r.combo;
+    stopCapture(); readEditor();
+  } else if (r.error === "no_extension" || r.error === "daemon" || r.error === "grab") {
+    window.addEventListener("keydown", onCaptureKey, true);
+    msg("Captura pelo navegador: atalhos do sistema (ex.: Ctrl+Alt+T) vão executar em vez de serem capturados. "
+      + (r.error === "grab" ? "O GNOME não liberou o teclado." : "Precisa do daemon e da extensão do GNOME."), "fail");
+  } else {
+    stopCapture();
+    if (r.timeout) msg("Captura expirou: nenhum atalho em 10 s.", "fail");
+  }
+}
+function stopCapture() {
+  if (!capturing) return;
+  captureSeq++;
+  capturing = false; $("#capture").textContent = "Capturar"; $("#capture").classList.remove("capturing");
+  $("#capture-hint").classList.remove("on");
+  window.removeEventListener("keydown", onCaptureKey, true);
+}
+
+// ------------------------------------------------------------ eventos ao vivo
+function connect() {
+  if (es) es.close();
+  es = new EventSource(`/api/events${$("#test-toggle").checked ? "?test=1" : ""}`);
+  es.onmessage = (m) => onEvent(JSON.parse(m.data));
+  es.onerror = () => setPill("#pill-daemon", false, "UI desconectada");
+}
+function setPill(id, ok, text) { const p = $(id); p.className = "pill " + (ok ? "ok" : "fail"); p.textContent = text; }
+function renderLive() {
+  $("#pill-profile").textContent = `perfil: ${live.profile || "—"}`;
+  renderMode();
+  if (cfg) { renderPTabs(); renderRecents(); }
+}
+const svgEl = (markup) => { const t = document.createElement("template"); t.innerHTML = markup; return t.content.firstChild; };
+const SVG_KEYBOARD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M6 9.5h.5M10 9.5h.5M14 9.5h.5M18 9.5h.5M8 14.5h8"/></svg>`;
+const SVG_LOCK = `<svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M7.5 11V8a4.5 4.5 0 0 1 9 0v3"/><rect x="4" y="11" width="16" height="11" rx="2.5" fill="currentColor" stroke="none"/></svg>`;
+const modeIcons = (locked) => h("span", { class: "ico", "aria-hidden": "true" }, svgEl(SVG_KEYBOARD), locked ? svgEl(SVG_LOCK) : null);
+let modeShown = null;
+function renderMode() {
+  const b = $("#mode-badge"), state = live.daemon === false ? "off" : live.locked ? "locked" : "auto";
+  b.className = "mode-badge" + (state === "auto" ? "" : " " + state);
+  b.replaceChildren(...(state === "off" ? ["modo ?"] : state === "locked"
+    ? [modeIcons(true), (live.lockedProfile || live.profile || "Global").toUpperCase(), h("small", {}, "fixo")]
+    : [modeIcons(false), "AUTO", h("small", {}, live.profile || "")]));
+  if (modeShown && modeShown !== state && state !== "off") {  // mudou: dá um "pulo" para chamar atenção
+    b.classList.add("pop"); setTimeout(() => b.classList.remove("pop"), 250);
+  }
+  modeShown = state;
+}
+function onEvent(ev) {
+  if (ev.type === "daemon_down") {
+    live.daemon = false; renderMode();
+    setPill("#pill-daemon", false, "daemon parado"); setPill("#pill-pad", false, "macropad ?"); setPill("#pill-ext", false, "extensão ?");
+  } else if (ev.type === "status") {
+    live.daemon = true;
+    setPill("#pill-daemon", true, ev.test_mode ? "daemon (teste)" : "daemon ativo");
+    setPill("#pill-pad", ev.connected, ev.connected ? "macropad conectado" : "macropad ausente");
+    setPill("#pill-ext", ev.extension, ev.extension ? "extensão conectada" : "extensão ausente");
+    if (!ev.holding) $$(".key.holding").forEach((k) => k.classList.remove("holding"));
+    Object.assign(live, { profile: ev.profile, window: ev.window, recents: ev.recents || [], extension: ev.extension, locked: !!ev.locked, lockedProfile: ev.locked_profile || null });
+    renderLive();
+  } else if (ev.type === "focus") {
+    Object.assign(live, { profile: ev.profile, window: ev.window, recents: ev.recents || [], locked: !!ev.locked, lockedProfile: ev.locked_profile || null });
+    if (ev.changed) renderProfiles();
+    renderLive();
+  } else if (ev.type === "mode") {
+    Object.assign(live, { profile: ev.profile, locked: !!ev.locked, lockedProfile: ev.locked_profile || null });
+    if (cfg) renderProfiles();
+    renderLive();
+  } else if (ev.type === "key") {
+    if (ev.test_mode && cfg && NAMES[ev.key]) {
+      const i = cfg.profiles.findIndex((p) => p.name === ev.profile);
+      if (i >= 0 && i !== selP) selectProfile(i);
+      selectKey(ev.key, ev.gesture);
+    }
+    flash(ev); log(ev);
+  }
+}
+function flash(ev) {
+  // combinação: acendem os dois botões e o cartão dela na lista
+  const sels = isChord(ev.key) ? [...chordKeys(ev.key).map((k) => `[data-key="${k}"]`), `[data-chord="${ev.key}"]`] : [`[data-key="${ev.key}"]`];
+  for (const el of $$(sels.join(", "))) {
+    el.classList.remove("hit"); void el.offsetWidth; el.classList.add("hit");
+    setTimeout(() => el.classList.remove("hit"), 220);
+    if (el.dataset.chord) continue;
+    if (ev.hold === "holding") el.classList.add("holding");
+    if (ev.hold === "released") el.classList.remove("holding");
+  }
+}
+function log(ev) {
+  const who = (NAMES[ev.key] || "tecla não mapeada") + (GESTURE_NAMES[ev.gesture] && ev.gesture !== "tap" ? ` (${GESTURE_NAMES[ev.gesture].toLowerCase()})` : "");
+  let badge = ["badge", "—"];
+  if (!ev.mapped) badge = ["badge unk", "não mapeada"];
+  else if (ev.test_mode) badge = ["badge test", "teste"];
+  else if (ev.profile_op === "lock") badge = ["badge exec", `🔒 ${ev.target} fixo`];
+  else if (ev.profile_op === "unlock") badge = ["badge exec", "🔓 automático"];
+  else if (ev.profile_op === "oneshot") badge = ["badge exec", `☝ ${ev.target} por um toque`];
+  else if (ev.profile_op === "oneshot_off") badge = ["badge exec", "☝ voltou"];
+  else if (ev.confirm) badge = ["badge exec", "confirmou troca"];
+  else if (ev.hold === "holding") badge = ["badge exec", ev.mode === "while_held" ? "segurando" : "ligado"];
+  else if (ev.hold === "released") badge = ["badge exec", ev.mode === "while_held" ? "soltou" : "desligado"];
+  else if (ev.step) badge = ["badge exec", ev.step];
+  else if (ev.executed) badge = ["badge exec", "executado"];
+  const text = [ev.profile, who, ev.label].filter(Boolean).join(" · ");
+  const parts = () => [
+    h("time", {}, new Date(ev.time * 1000).toLocaleTimeString("pt-BR")),
+    h("span", { class: "k" }, ev.key),
+    h("span", { class: "w", title: text }, text),
+    h("span", { class: badge[0] }, badge[1])];
+  // lista completa na aba Uso; na aba Botões só a última linha
+  const ol = $("#log");
+  ol.querySelector(".empty")?.remove();
+  ol.prepend(h("li", { class: "evrow" }, parts()));
+  while (ol.children.length > 40) ol.lastChild.remove();
+  $("#last-ev").replaceChildren(...parts());
+  if ($("#test-modal").open) {
+    const tl = $("#test-log");
+    tl.querySelector(".empty")?.remove();
+    tl.prepend(h("li", { class: "evrow" }, parts()));
+    while (tl.children.length > 200) tl.lastChild.remove();
+    tmCount(tl.children.length);
+  }
+}
+const tmCount = (n) => { $("#tm-count").textContent = n === 1 ? "1 evento" : `${n} eventos`; };
+function clearTestLog() {
+  $("#test-log").replaceChildren(h("li", { class: "empty" }, "Aperte algo no macropad…"));
+  tmCount(0);
+}
+
+// ------------------------------------------------------------ saúde
+// O servidor roda as verificações a cada N s e grava cada rodada no SQLite; aqui cada verificação
+// vira uma linha com um gráfico (um ponto por rodada, a mais nova à direita, rolagem para o passado).
+const H_STEP = 12, H_H = 40, H_PAD = 7, H_MAX = 3000;
+const H_Y = { ok: H_PAD, warn: H_H / 2, fail: H_H - H_PAD };
+const ICONS = { ok: "✓", warn: "!", fail: "✕" }, STATUS_PT = { ok: "ok", warn: "aviso", fail: "falha" };
+const hist = { runs: [], more: false, interval: 30, rows: new Map(), loading: false };
+const escXml = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const fmtTs = (ts) => {
+  const d = new Date(ts * 1000), today = d.toDateString() === new Date().toDateString();
+  return d.toLocaleString("pt-BR", today ? { timeStyle: "medium" } : { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+};
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+function healthDown() {
+  const s = $("#summary");
+  s.textContent = "Servidor da UI sem resposta"; s.style.color = "var(--fail)";
+  setSvcBadge("unknown", "Sem resposta do servidor");
+  setStartLock(false); // estado desconhecido: não trava o Iniciar
+}
+// badge no card Serviço: os três componentes que rodam (systemd, socket do daemon, extensão)
+const SVC_CHECKS = ["Serviço", "Daemon", "Extensão do GNOME"];
+function setSvcBadge(status, text) {
+  const b = $("#svc-badge");
+  b.className = `svc-badge ${status}`;
+  b.replaceChildren(h("span", { class: "ico" + (ICONS[status] ? ` ${status}` : "") }, ICONS[status] || "?"), text);
+}
+function setStartLock(running) {
+  const b = $('[data-svc="start"]');
+  b.disabled = running;
+  b.title = running ? "O serviço já está rodando" : "";
+}
+function renderServices(checks) {
+  const by = new Map(checks.map((c) => [c[0], c[1]]));
+  const bad = SVC_CHECKS.filter((n) => by.get(n) === "fail"), warn = SVC_CHECKS.filter((n) => by.get(n) === "warn");
+  if (bad.length) setSvcBadge("fail", `Com problema: ${bad.join(", ")}`);
+  else if (warn.length) setSvcBadge("warn", `Atenção: ${warn.join(", ")}`);
+  else setSvcBadge("ok", "Todos os serviços ativos");
+  setStartLock(by.get("Serviço") === "ok");
+}
+async function loadHealth(retry = true) { // abre a aba: a página mais recente do histórico
+  try {
+    const d = await getJSON("/api/health/history");
+    if (!d.runs.length && retry) { // servidor acabou de subir (ou histórico desligado): verifica agora
+      const { checks } = await getJSON("/api/health");
+      if (d.error) d.runs = [{ id: 0, ts: Date.now() / 1000, checks: checks.map((c) => [c.name, c.status, c.detail, c.hint]) }];
+      else return loadHealth(false);
+    }
+    Object.assign(hist, { runs: d.runs, more: d.more, interval: d.interval });
+    renderHealth(0, true);
+    if (d.error) $("#h-last").textContent = d.error;
+  } catch { healthDown(); }
+}
+async function pollHealth() { // pega só as rodadas novas
+  if ($("#tab-health").hidden) return;
+  const last = hist.runs.at(-1);
+  if (!last) return loadHealth(false);
+  try {
+    const d = await getJSON(`/api/health/history?after=${last.id}`);
+    if (d.more) return loadHealth(); // ficou um buraco grande: recomeça do fim
+    if (!d.runs.length) return;
+    hist.runs.push(...d.runs);
+    const drop = Math.max(0, hist.runs.length - H_MAX); // não deixa a aba aberta crescer sem limite
+    if (drop) { hist.runs.splice(0, drop); hist.more = true; }
+    renderHealth(-drop);
+  } catch { healthDown(); }
+}
+async function loadOlder() { // rolou até o começo: busca a página anterior
+  if (hist.loading || !hist.more || !hist.runs.length) return;
+  hist.loading = true;
+  try {
+    const d = await getJSON(`/api/health/history?before=${hist.runs[0].id}`);
+    hist.runs.unshift(...d.runs); hist.more = d.more;
+    renderHealth(d.runs.length);
+  } catch {} finally { hist.loading = false; }
+}
+async function checkNow() {
+  $("#refresh").disabled = true;
+  try { await getJSON("/api/health"); await pollHealth(); } catch { healthDown(); } finally { $("#refresh").disabled = false; }
+}
+function healthRow(name) {
+  const r = { ico: h("span", { class: "ico" }), detail: h("span", { class: "cdetail" }), hint: h("span", { class: "chint" }),
+              chart: h("div", { class: "hchart", tabindex: "0", role: "img", "aria-label": `Histórico de ${name}` }) };
+  r.li = h("li", {}, r.ico, h("span", { class: "cname" }, name), r.detail, r.hint, r.chart);
+  r.chart.addEventListener("scroll", () => { if (r.chart.scrollLeft < 80) loadOlder(); }, { passive: true });
+  return r;
+}
+// shift = rodadas que entraram (+) ou saíram (−) pela esquerda, para manter a mesma parte à vista
+function renderHealth(shift = 0, toEnd = false) {
+  const latest = hist.runs.at(-1), ul = $("#checks");
+  $("#h-every").textContent = `um ponto a cada ${hist.interval} s · passe o mouse para ver hora e detalhe`;
+  if (latest) $("#h-last").textContent = `última: ${fmtTs(latest.ts)}`;
+  if (!latest || !latest.checks.length) {
+    hist.rows.clear();
+    return ul.replaceChildren(h("li", { class: "empty" }, "Verificando…"));
+  }
+  ul.querySelector(".empty")?.remove();
+  const names = new Set(latest.checks.map((c) => c[0]));
+  for (const [name, row] of hist.rows) if (!names.has(name)) { row.li.remove(); hist.rows.delete(name); }
+  latest.checks.forEach(([name, status, detail, hint], i) => {
+    let row = hist.rows.get(name);
+    if (!row) hist.rows.set(name, (row = healthRow(name)));
+    if (ul.children[i] !== row.li) ul.insertBefore(row.li, ul.children[i] || null); // só move se mudou de lugar
+    row.ico.className = `ico ${status}`; row.ico.textContent = ICONS[status] || "?";
+    row.detail.textContent = detail; row.hint.textContent = hint; row.hint.hidden = !hint;
+    drawHealthChart(row, name, shift, toEnd);
+  });
+  const st = latest.checks.map((c) => c[1]);
+  const bad = st.filter((x) => x === "fail").length, warn = st.filter((x) => x === "warn").length;
+  const s = $("#summary");
+  s.textContent = bad ? `${bad} problema(s)` : warn ? `${warn} aviso(s)` : "Tudo certo";
+  s.style.color = bad ? "var(--fail)" : warn ? "var(--warn)" : "var(--ok)";
+  renderServices(latest.checks);
+}
+function drawHealthChart(row, name, shift, toEnd) {
+  const el = row.chart, runs = hist.runs, n = runs.length;
+  const atEnd = toEnd || el.scrollLeft + el.clientWidth >= el.scrollWidth - 4, prev = el.scrollLeft;
+  const w = Math.max(el.clientWidth, n * H_STEP + 2 * H_PAD);
+  const x = (i) => w - H_PAD - (n - 1 - i) * H_STEP; // alinhado à direita: a rodada mais nova encosta no fim
+  let path = "", pen = false, dots = "", gaps = "";
+  for (let i = 0; i < n; i++) {
+    const run = runs[i];
+    run.byName ??= new Map(run.checks.map((c) => [c[0], c]));
+    if (i && run.ts - runs[i - 1].ts > hist.interval * 2.5) { // a UI ficou fechada: quebra a linha e marca
+      pen = false;
+      const gx = x(i) - H_STEP / 2;
+      gaps += `<g class="gap"><title>Sem verificações de ${fmtTs(runs[i - 1].ts)} a ${fmtTs(run.ts)} (UI fechada)</title>` +
+              `<rect x="${gx - 4}" y="0" width="8" height="${H_H}"/><line x1="${gx}" x2="${gx}" y1="3" y2="${H_H - 3}"/></g>`;
+    }
+    const c = run.byName.get(name);
+    if (!c) { pen = false; continue; }
+    const [, status, detail] = c, cx = x(i), cy = H_Y[status] ?? H_Y.warn;
+    path += `${pen ? "L" : "M"}${cx} ${cy}`; pen = true;
+    dots += `<g class="${status}"><title>${escXml(`${fmtTs(run.ts)} · ${STATUS_PT[status] || status}\n${detail}`)}</title>` +
+            `<rect x="${cx - H_STEP / 2}" y="0" width="${H_STEP}" height="${H_H}"/><circle cx="${cx}" cy="${cy}" r="3.5"/></g>`;
+  }
+  el.innerHTML = `<svg width="${w}" height="${H_H}" viewBox="0 0 ${w} ${H_H}">` +
+    `<line class="guide" x1="0" x2="${w}" y1="${H_Y.ok}" y2="${H_Y.ok}"/><line class="guide" x1="0" x2="${w}" y1="${H_Y.fail}" y2="${H_Y.fail}"/>` +
+    `${gaps}<path class="trace" d="${path}"/>${dots}</svg>`;
+  el.scrollLeft = atEnd ? el.scrollWidth : prev + shift * H_STEP;
+}
+async function service(action) {
+  $("#svc-out").textContent = `systemctl --user ${action} macropad-claude…`;
+  const r = await (await fetch("/api/service", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) })).json();
+  $("#svc-out").textContent = r.ok ? `${action}: ok` : `${action} falhou:\n${r.output}`;
+  setTimeout(checkNow, 1200);
+}
+
+// ------------------------------------------------------------ uso
+// O daemon soma os macros executados por dia/perfil/botão (usage.db); aqui viram os gráficos.
+const usage = { days: 30, data: null, busy: false };
+try { const d = localStorage.getItem("usageDays"); if (d !== null && /^\d+$/.test(d)) usage.days = +d; } catch {}
+const fmtN = (n) => n.toLocaleString("pt-BR");
+const pct = (n, t) => (t ? `${Math.round((n / t) * 100)}%` : "0%");
+const dayDate = (d) => new Date(`${d}T12:00:00`);
+const fmtDay = (d, opts = { day: "2-digit", month: "2-digit" }) => dayDate(d).toLocaleDateString("pt-BR", opts);
+const macroName = (key, label) => label || NAMES[key] || key;
+const SHORT = { F13: "botão 1", F14: "botão 2", F15: "botão 3", F16: "botão 4", F17: "botão 5", F18: "botão 6", F19: "knob ←", F20: "knob clique", F21: "knob →" };
+
+// cor segue o perfil (nunca a posição no ranking): ordem da config, depois os que só existem no histórico
+function profileColors(names) {
+  const order = [...(cfg?.profiles || []).map((p) => p.name)];
+  for (const n of names) if (!order.includes(n)) order.push(n);
+  return Object.fromEntries(order.map((n, i) => [n, i < 8 ? `var(--s${i + 1})` : "var(--s-other)"]));
+}
+
+async function loadUsage() {
+  if (usage.busy) return;
+  usage.busy = true;
+  $$("#u-period .ptab").forEach((b) => b.classList.toggle("sel", +b.dataset.days === usage.days));
+  try {
+    const d = await getJSON(`/api/usage?days=${usage.days}`);
+    usage.data = d; renderUsage();
+  } catch (err) {
+    $("#u-body").replaceChildren(h("div", { class: "card uempty" }, h("b", {}, "Não consegui ler as estatísticas"), String(err.message || err)));
+  } finally { usage.busy = false; }
+}
+
+function renderUsage() {
+  const d = usage.data, body = $("#u-body");
+  const rows = d.macros.map(([profile, key, label, action, n]) => ({ profile, key, label, action, n, name: macroName(key, label) }));
+  const total = rows.reduce((a, r) => a + r.n, 0);
+  $("#u-note").textContent = d.first ? `contando desde ${fmtDay(d.first, { dateStyle: "short" })} · atualiza sozinho` : "";
+  if (!total) {
+    return body.replaceChildren(h("div", { class: "card uempty" },
+      h("b", {}, d.first ? "Nada neste período" : "Nenhum uso registrado ainda"),
+      d.first ? "Escolha um período maior." : "Aperte uns botões do macropad (fora do modo teste); os números aparecem aqui em até 10 s."));
+  }
+
+  // agregados
+  const byProfile = new Map(), byMacro = new Map(), perProfile = new Map();
+  for (const r of rows) {
+    byProfile.set(r.profile, (byProfile.get(r.profile) || 0) + r.n);
+    const mk = r.name.toLowerCase();
+    const m = byMacro.get(mk) || byMacro.set(mk, { name: r.name, n: 0, profiles: new Map() }).get(mk);
+    m.n += r.n; m.profiles.set(r.profile, (m.profiles.get(r.profile) || 0) + r.n);
+    const pm = perProfile.get(r.profile) || perProfile.set(r.profile, new Map()).get(r.profile);
+    const k = `${r.key}\u0000${r.label}`;
+    const e = pm.get(k) || pm.set(k, { name: r.name, key: r.key, label: r.label, n: 0 }).get(k);
+    e.n += r.n;
+  }
+  const profiles = [...byProfile].sort((a, b) => b[1] - a[1]);
+  const macros = [...byMacro.values()].sort((a, b) => b.n - a.n);
+  const color = profileColors(profiles.map((p) => p[0]));
+
+  // dias no período (com os vazios), para a média e o gráfico por dia
+  const start = d.days > 0 ? new Date(Date.now() - (d.days - 1) * 86400000) : dayDate(d.first);
+  const dayList = [];
+  for (let t = dayDate(start.toLocaleDateString("sv-SE")); t <= dayDate(d.today); t.setDate(t.getDate() + 1))
+    dayList.push(t.toLocaleDateString("sv-SE")); // sv-SE = AAAA-MM-DD na hora local
+
+  // KPIs
+  const kpi = (k, v, sub, c) => h("div", { class: "kpi" }, h("div", { class: "k" }, k),
+    h("div", { class: "v", title: v }, c ? h("span", { class: "sw", style: `background:${c}` }) : null, v), h("div", { class: "s" }, sub));
+  const topP = profiles[0], topM = macros[0];
+  const kpis = h("div", { class: "kpis" },
+    kpi("Macros executados", fmtN(total), d.days === 1 ? "hoje" : d.days ? `nos últimos ${d.days} dias` : "desde o começo"),
+    kpi("Perfil mais usado", topP[0], `${fmtN(topP[1])} · ${pct(topP[1], total)} do total`, color[topP[0]]),
+    kpi("Macro mais usado", topM.name, `${fmtN(topM.n)} · ${pct(topM.n, total)} do total`),
+    kpi("Média por dia", fmtN(Math.round((total / Math.max(1, dayList.length)) * 10) / 10), `em ${dayList.length} dia(s)`));
+
+  // perfis
+  const pMax = topP[1];
+  const pBars = h("div", { class: "bars" }, profiles.map(([name, n]) => h("div", { class: "brow", "data-tip": `<b>${escXml(name)}</b>\n${fmtN(n)} macros · ${pct(n, total)}` },
+    h("span", { class: "bname" }, name),
+    h("span", { class: "btrack" }, h("span", { class: "bseg", style: `width:${(n / pMax) * 100}%;background:${color[name]}` })),
+    h("span", { class: "bval" }, h("b", {}, fmtN(n)), ` · ${pct(n, total)}`))));
+
+  // macros (todos os perfis): barra empilhada pelo perfil onde rodou
+  const TOP = 10, mMax = topM.n;
+  const mBars = h("div", { class: "bars" }, macros.slice(0, TOP).map((m) => {
+    const parts = [...m.profiles].sort((a, b) => b[1] - a[1]);
+    const tip = `<b>${escXml(m.name)}</b>: ${fmtN(m.n)}\n` + parts.map(([p, n]) => `${escXml(p)}: ${fmtN(n)}`).join("\n");
+    return h("div", { class: "brow", "data-tip": tip },
+      h("span", { class: "bname", title: m.name }, m.name),
+      h("span", { class: "btrack" }, h("span", { style: `display:flex;gap:2px;width:${(m.n / mMax) * 100}%` },
+        parts.map(([p, n]) => h("span", { class: "bseg", style: `flex:${n} 1 0;background:${color[p]}` })))),
+      h("span", { class: "bval" }, h("b", {}, fmtN(m.n))));
+  }));
+  const legend = h("div", { class: "ulegend" }, profiles.map(([p]) => h("span", { style: `--c:${color[p]}` }, p)));
+  const more = macros.length > TOP ? h("p", { class: "hint" }, `+ ${macros.length - TOP} outro(s) com ${fmtN(macros.slice(TOP).reduce((a, m) => a + m.n, 0))} usos`) : null;
+
+  const grid = h("div", { class: "ugrid" },
+    h("div", { class: "card" }, h("h3", {}, "Perfis mais usados"), pBars),
+    h("div", { class: "card" }, h("h3", {}, "Macros mais usados · todos os perfis"), legend, mBars, more));
+
+  // por dia (ou por semana, em períodos longos)
+  const daily = new Map();
+  for (const [day, p, n] of d.daily) (daily.get(day) || daily.set(day, new Map()).get(day)).set(p, n);
+  let buckets = dayList.map((day) => ({ from: day, to: day, by: daily.get(day) || new Map() }));
+  const weekly = buckets.length > 92;
+  if (weekly) {
+    const w = [];
+    buckets.forEach((b, i) => {
+      if (i % 7 === 0) w.push({ from: b.from, to: b.to, by: new Map() });
+      const cur = w.at(-1); cur.to = b.to;
+      for (const [p, n] of b.by) cur.by.set(p, (cur.by.get(p) || 0) + n);
+    });
+    buckets = w;
+  }
+  const bTot = (b) => [...b.by.values()].reduce((a, n) => a + n, 0);
+  const yMax = Math.max(1, ...buckets.map(bTot));
+  const pOrder = profiles.map((p) => p[0]); // o mais usado fica embaixo, em todas as colunas
+  const days = h("div", { class: "days" },
+    h("div", { class: "grid", style: "top:4px" }, h("span", {}, fmtN(yMax))),
+    h("div", { class: "grid", style: "top:calc(4px + (100% - 4px) / 2)" }, h("span", {}, fmtN(Math.round(yMax / 2)))),
+    buckets.map((b) => {
+      const t = bTot(b);
+      const when = b.from === b.to ? fmtDay(b.from, { weekday: "short", day: "2-digit", month: "2-digit" }) : `${fmtDay(b.from)} a ${fmtDay(b.to)}`;
+      const tip = `<b>${when}</b>: ${fmtN(t)}` + pOrder.filter((p) => b.by.get(p)).map((p) => `\n${escXml(p)}: ${fmtN(b.by.get(p))}`).join("");
+      const segs = pOrder.filter((p) => b.by.get(p)), gaps = 2 * Math.max(0, segs.length - 1);
+      return h("div", { class: "dcol", "data-tip": tip },
+        segs.map((p) => h("i", { style: `height:calc((100% - ${gaps}px) * ${b.by.get(p) / yMax});background:${color[p]}` })));
+    }));
+  const first = buckets[0], last = buckets.at(-1), mid = buckets[Math.floor(buckets.length / 2)];
+  const axis = h("div", { class: "dax" }, h("span", {}, fmtDay(first.from)),
+    buckets.length > 2 ? h("span", {}, fmtDay(mid.from)) : null, h("span", {}, d.days === 1 ? "hoje" : fmtDay(last.to)));
+  const dayCard = h("div", { class: "card", style: "margin-bottom:20px" },
+    h("h3", {}, weekly ? "Macros por semana" : "Macros por dia"), h("div", { class: "ulegend" }, profiles.map(([p]) => h("span", { style: `--c:${color[p]}` }, p))), days, axis);
+
+  // um card por perfil, com os botões mais usados nele (pelo nome do macro)
+  const cards = profiles.map(([p, pn]) => {
+    const list = [...perProfile.get(p).values()].sort((a, b) => b.n - a.n);
+    const max = list[0].n;
+    return h("div", { class: "card" },
+      h("h3", {}, h("span", { class: "sw", style: `background:${color[p]}` }), p, h("span", { class: "tot" }, `${fmtN(pn)} · ${pct(pn, total)}`)),
+      h("div", { class: "bars" }, list.map((m) => h("div", { class: "brow", "data-tip": `<b>${escXml(m.name)}</b> (${escXml(NAMES[m.key] || m.key)})\n${fmtN(m.n)} · ${pct(m.n, pn)} do perfil` },
+        h("span", { class: "bname", title: m.name }, m.name, m.label ? h("small", {}, SHORT[m.key] || m.key) : null),
+        h("span", { class: "btrack" }, h("span", { class: "bseg", style: `width:${(m.n / max) * 100}%;background:${color[p]}` })),
+        h("span", { class: "bval" }, h("b", {}, fmtN(m.n)), ` · ${pct(m.n, pn)}`)))));
+  });
+
+  body.replaceChildren(kpis, grid, dayCard, h("h3", {}, "Botões mais usados por perfil"), h("div", { class: "uprof" }, cards));
+}
+
+// tooltip único da aba (hover em qualquer [data-tip])
+(() => {
+  const tip = $("#utip");
+  const hide = () => { tip.hidden = true; };
+  $("#tab-usage").addEventListener("mousemove", (ev) => {
+    const el = ev.target.closest("[data-tip]");
+    if (!el) return hide();
+    tip.innerHTML = el.dataset.tip; tip.hidden = false;
+    const r = tip.getBoundingClientRect();
+    let x = ev.clientX + 14, y = ev.clientY + 14;
+    if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+    if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+    tip.style.left = `${Math.max(8, x)}px`; tip.style.top = `${Math.max(8, y)}px`;
+  });
+  $("#tab-usage").addEventListener("mouseleave", hide);
+  window.addEventListener("scroll", hide, { passive: true });
+})();
+$$("#u-period .ptab").forEach((b) => b.addEventListener("click", () => {
+  usage.days = +b.dataset.days;
+  try { localStorage.setItem("usageDays", String(usage.days)); } catch {}
+  loadUsage();
+}));
+setInterval(() => { if (!$("#tab-usage").hidden) loadUsage(); }, 10000);
+
+// ------------------------------------------------------------ ligações
+$$("[data-key]").forEach((el) => el.addEventListener("click", (ev) => {
+  const k = el.dataset.key, button = BUTTON_KEYS.includes(k);
+  // Shift+clique liga o modo mesmo se o Shift foi apertado com o foco num campo (ou logo depois de outra combinação)
+  if (ev.shiftKey && button && cfg && !chordOn()) setChordMode({ shift: true });
+  if (!chordOn()) return selectKey(k);
+  if (button) pickKey(k);
+}));
+// Shift+clique não estende seleção de texto nem tira o foco de onde está
+$$(".pad .key").forEach((el) => el.addEventListener("mousedown", (ev) => { if (ev.shiftKey) ev.preventDefault(); }));
+// Shift sozinho, fora de campos de texto e da captura de atalho, liga o modo combinação enquanto estiver apertado
+const typing = (t) => t instanceof Element && t.matches("input:not([type=checkbox]):not([type=radio]), textarea, select, [contenteditable]");
+window.addEventListener("keydown", (ev) => {
+  if (ev.key === "Shift") {
+    if (!ev.repeat && !ev.ctrlKey && !ev.altKey && !ev.metaKey && cfg && !capturing && !drag.el && !typing(ev.target) && !$("#tab-keys").hidden)
+      setChordMode({ shift: true });
+  } else if (ev.key === "Escape" && chordOn()) {
+    ev.preventDefault(); setChordMode({ shift: false, sticky: false });
+  } else if (chordPick.shift) setChordMode({ shift: false });  // Shift + outra tecla é atalho, não combinação
+});
+window.addEventListener("keyup", (ev) => { if (ev.key === "Shift") setChordMode({ shift: false }); });
+window.addEventListener("blur", () => setChordMode({ shift: false }));
+// combinação selecionada + clique fora do teclado, das combinações e do editor: volta ao estado normal
+document.addEventListener("click", (ev) => {
+  if (!cfg || !isChord(sel) || chordOn() || $("#tab-keys").hidden) return;
+  // composedPath: o cartão clicado é recriado durante o clique e já não está na página
+  if (ev.composedPath().some((el) => el.matches?.("#pad, #chords, #chord-mode, #editor, #savebar, #ptabs"))) return;
+  selectKey(lastKey);
+});
+$("#chord-mode").addEventListener("click", () => setChordMode(chordOn() ? { shift: false, sticky: false } : { sticky: true }));
+const trayStart = () => { if ($("#chord-tray").classList.contains("idle")) setChordMode({ sticky: true }); };
+$("#chord-tray").addEventListener("click", trayStart);
+$("#chord-tray").addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); trayStart(); } });
+["#ed-label", "#ed-text", "#ed-combo", "#ed-items", "#ed-scroll-n", "#ed-url"].forEach((s) => $(s).addEventListener("input", readEditor));
+$("#ed-shared").addEventListener("change", (ev) => setShared(sel, ev.target.checked));
+["#ed-enter", "#ed-items-enter", "#slash", "#ed-scroll-dir", "#ed-app", "#ed-newwin", "#ed-profile"].forEach((s) => $(s).addEventListener("change", readEditor));
+$("#ed-action").addEventListener("change", onActionChange);
+$("#ed-mode").addEventListener("change", onModeChange);
+$("#ed-gesture-remove").addEventListener("click", () => {
+  if (isChord(sel)) { delete P().chords[sel]; fixChordSel(); } else keyOf(P(), sel)[selG] = null;
+  selG = "tap"; renderEditor(); changed();
+});
+$("#ed-app-filter").addEventListener("input", renderAppList);
+$("#capture").addEventListener("click", () => (capturing ? stopCapture() : startCapture()));
+$("#save").addEventListener("click", save);
+$("#mode-badge").addEventListener("click", () => {
+  if (live.daemon === false) return;
+  fetch("/api/lock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: !live.locked }) });
+});
+$("#revert").addEventListener("click", () => { cfg = JSON.parse(saved); selP = Math.min(selP, cfg.profiles.length - 1); renderAll(); dirty(); });
+const PAD_HINT = "Clique num controle para editar; arraste um botão sobre outro para trocar os dois; Shift + clique em dois botões faz uma combinação. Em itálico: herdado do Global.";
+$("#pad-hint").textContent = PAD_HINT;
+$("#test-toggle").addEventListener("change", () => {
+  const on = $("#test-toggle").checked, dlg = $("#test-modal");
+  $("#pad-hint").textContent = on
+    ? "Modo teste: as teclas aparecem aqui mas NÃO são executadas. Apertar um botão físico seleciona ele (no perfil ativo)."
+    : PAD_HINT;
+  if (on && !dlg.open) { clearTestLog(); dlg.showModal(); }
+  else if (!on && dlg.open) dlg.close();
+  connect();
+});
+// fechar o modal (Esc, botão ou clique fora) sai do modo teste
+$("#test-modal").addEventListener("close", () => {
+  if ($("#test-toggle").checked) { $("#test-toggle").checked = false; $("#test-toggle").dispatchEvent(new Event("change")); }
+});
+$("#test-modal").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+$("#tm-close").addEventListener("click", () => $("#test-modal").close());
+$("#tm-clear").addEventListener("click", clearTestLog);
+// gaveta lateral: aberta por padrão; em tela estreita começa fechada e flutua por cima
+const narrow = matchMedia("(max-width: 860px)");
+const setDrawer = (open) => {
+  document.body.classList.toggle("drawer-closed", !open);
+  $("#drawer-toggle").setAttribute("aria-expanded", open);
+};
+setDrawer(!narrow.matches);
+narrow.addEventListener("change", (e) => setDrawer(!e.matches));
+$("#drawer-toggle").addEventListener("click", () => setDrawer(document.body.classList.contains("drawer-closed")));
+$("#drawer-scrim").addEventListener("click", () => setDrawer(false));
+function showTab(tab) {
+  $$("nav.drawer button").forEach((x) => x.classList.toggle("active", x.dataset.tab === tab));
+  for (const t of ["keys", "profiles", "health", "usage"]) $(`#tab-${t}`).hidden = tab !== t;
+  if (tab !== "keys") setChordMode({ shift: false, sticky: false });
+  $("#savebar").hidden = tab === "health" || tab === "usage";
+  if (tab === "health") loadHealth();
+  if (tab === "usage") loadUsage();
+  window.scrollTo(0, 0);
+}
+$$("nav.drawer button").forEach((b) => b.addEventListener("click", () => {
+  showTab(b.dataset.tab);
+  if (narrow.matches) setDrawer(false);
+}));
+$("#p-edit-keys").addEventListener("click", () => showTab("keys"));
+$("#ev-all").addEventListener("click", () => showTab("usage"));
+$("#win-filter").addEventListener("input", renderRecents);
+
+// tema: segue o sistema até a pessoa escolher; a escolha fica salva neste navegador
+const darkMQ = matchMedia("(prefers-color-scheme: dark)");
+const isDark = () => (document.documentElement.dataset.theme || (darkMQ.matches ? "dark" : "light")) === "dark";
+const syncThemeBtn = () => {
+  const label = isDark() ? "Mudar para o tema claro" : "Mudar para o tema escuro";
+  $("#theme-toggle").title = label; $("#theme-toggle").setAttribute("aria-label", label);
+};
+syncThemeBtn();
+darkMQ.addEventListener("change", syncThemeBtn);
+$("#theme-toggle").addEventListener("click", () => {
+  const next = isDark() ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("theme", next); } catch {}
+  syncThemeBtn();
+});
+$("#refresh").addEventListener("click", checkNow);
+setInterval(pollHealth, 5000); // só faz algo com a aba Saúde aberta
+window.addEventListener("resize", () => { if (!$("#tab-health").hidden && hist.runs.length) renderHealth(); });
+$$("[data-svc]").forEach((b) => b.addEventListener("click", () => service(b.dataset.svc)));
+$("#p-new").addEventListener("click", () => newProfile("Novo perfil"));
+// "Acionar perfil" guarda o nome: renomear arrasta junto as teclas que apontavam para este perfil
+// (separadas ao focar o campo, para um nome intermediário igual ao de outro perfil não misturar)
+let renameRefs = [];
+const allGestures = () => cfg.profiles.flatMap((p) => [
+  ...KEYS.flatMap((k) => (p.keys[k].inherit ? [] : GESTURES.map((g) => p.keys[k][g]).filter(Boolean))),
+  ...Object.values(p.chords || {}).filter((c) => !c.inherit).map((c) => c.tap)]);
+const profileRefs = (name) => allGestures().filter((s) => s.action === "profile" && s.profile === name);
+$("#p-name").addEventListener("focus", () => { renameRefs = profileRefs(P().name); });
+$("#p-name").addEventListener("input", (ev) => {
+  for (const s of renameRefs) { if (s.label === s.profile) s.label = ev.target.value; s.profile = ev.target.value; }
+  P().name = ev.target.value; renderPTabs(); changed();
+});
+$("#p-add-rule").addEventListener("click", () => addRule({}));
+$("#p-delete").addEventListener("click", () => {
+  if (P().fallback || !confirm(`Excluir o perfil "${P().name}"?`)) return;
+  for (const s of profileRefs(P().name)) { if (s.label === s.profile) s.label = globalP().name; s.profile = globalP().name; }
+  cfg.profiles.splice(selP, 1); selP = Math.max(0, selP - 1); renderAll(); dirty();
+});
+for (const [kind, field] of [["text", "#ed-text"], ["cycle", "#ed-items"]])
+  for (const v of CHIPS[kind]) $(`[data-chips="${kind}"]`).append(chip(v, field));
+for (const [u, name] of Object.entries(URL_CHIPS)) $('[data-chips="url"]').append(chip(u, "#ed-url", name));
+window.addEventListener("beforeunload", (e) => { if (cfg && JSON.stringify(cfg) !== saved) e.preventDefault(); });
+setInterval(() => { if (!$("#tab-profiles").hidden && cfg) renderRecents(); }, 5000);
+
+// posição do macropad na mesa: só muda o desenho (preferência deste navegador)
+const applyFlip = (on) => { $("#pad").classList.toggle("flip", on); $("#pad-flip").setAttribute("aria-pressed", on); if (cfg) { renderMiniPad(); renderChords(); } };
+try { applyFlip(localStorage.getItem("padFlip") === "1"); } catch {}
+$("#pad-flip").addEventListener("click", (ev) => {
+  const btn = ev.currentTarget, pad = $("#pad"), on = !pad.classList.contains("flip");
+  btn.setAttribute("aria-pressed", on); // o ícone gira junto
+  try { localStorage.setItem("padFlip", on ? "1" : "0"); } catch {}
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !pad.animate) return applyFlip(on);
+  // o desenho gira 180° e, no fim, troca para o layout invertido com os textos de pé
+  btn.disabled = true;
+  const anim = pad.animate([{ transform: "rotate(0)" }, { transform: "rotate(180deg)" }],
+                           { duration: 450, easing: "cubic-bezier(.5, 0, .3, 1)", fill: "forwards" });
+  anim.onfinish = () => { applyFlip(on); anim.cancel(); btn.disabled = false; };
+});
+
+// #usage, #health… abre direto naquela aba
+if ($(`nav.drawer button[data-tab="${location.hash.slice(1)}"]`)) showTab(location.hash.slice(1));
+loadConfig().then(loadApps);
+connect();
+</script>
+</body>
+</html>

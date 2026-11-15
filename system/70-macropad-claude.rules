@@ -1,0 +1,12 @@
+# Macropad CH57x (1189:8890) + teclado virtual, acessíveis ao usuário logado (sem sudo).
+# Instalar em /etc/udev/rules.d/ e rodar:
+#   sudo udevadm control --reload && sudo udevadm trigger
+
+# Gravar a configuração no macropad (ch57x-keyboard-tool)
+SUBSYSTEM=="usb", ATTR{idVendor}=="1189", ATTR{idProduct}=="8890", TAG+="uaccess"
+
+# Ler as teclas do macropad (daemon)
+SUBSYSTEM=="input", ATTRS{idVendor}=="1189", ATTRS{idProduct}=="8890", TAG+="uaccess"
+
+# Criar o teclado virtual (daemon)
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"

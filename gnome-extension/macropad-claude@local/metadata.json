@@ -1,0 +1,7 @@
+{
+  "uuid": "macropad-claude@local",
+  "name": "Macropad 2000",
+  "description": "Informa a janela em foco ao daemon macropad-claude (perfis por aplicativo) e abre aplicativos a pedido dele.",
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "url": "https://github.com/"
+}

@@ -1,0 +1,253 @@
+{
+  "layout": {
+    "slash_key": "KEY_RO"
+  },
+  "profiles": [
+    {
+      "name": "Claude",
+      "match": [
+        {
+          "app": "org.gnome.Terminal.desktop",
+          "title_regex": "^[◐◑✳🤖]"
+        }
+      ],
+      "keys": {
+        "F13": {
+          "label": "voz",
+          "action": "combo",
+          "combo": "alt+k",
+          "mode": "toggle",
+          "double": {
+            "label": "limpar voz",
+            "action": "combo",
+            "combo": "ctrl+u"
+          }
+        },
+        "F14": {
+          "label": "submeter",
+          "action": "combo",
+          "combo": "enter"
+        },
+        "F15": {
+          "label": "backspace",
+          "action": "combo",
+          "combo": "backspace",
+          "mode": "while_held"
+        },
+        "F16": {
+          "label": "clear",
+          "action": "text",
+          "text": "/clear"
+        },
+        "F17": {
+          "label": "interrupt",
+          "action": "combo",
+          "combo": "ctrl+c"
+        },
+        "F18": {
+          "label": "Global",
+          "action": "profile",
+          "profile": "Global"
+        },
+        "F19": {
+          "label": "←",
+          "action": "combo",
+          "combo": "left"
+        },
+        "F20": {
+          "label": "effort",
+          "action": "text",
+          "text": "/effort\n"
+        },
+        "F21": {
+          "label": "→",
+          "action": "combo",
+          "combo": "right"
+        }
+      },
+      "chords": {
+        "F13+F14": {
+          "label": "model",
+          "action": "text",
+          "text": "/model\n"
+        }
+      }
+    },
+    {
+      "name": "Gemini",
+      "match": [
+        {
+          "app": "org.mozilla.firefox.desktop",
+          "title_regex": "Google Gemini"
+        }
+      ],
+      "keys": {
+        "F13": {
+          "label": "ditar",
+          "action": "combo",
+          "combo": "ctrl+shift+d"
+        },
+        "F14": {
+          "label": "submeter",
+          "action": "combo",
+          "combo": "enter"
+        },
+        "F16": {
+          "label": "novo chat",
+          "action": "combo",
+          "combo": "ctrl+shift+o"
+        },
+        "F17": {
+          "label": "interrupt",
+          "action": "combo",
+          "combo": "esc"
+        },
+        "F18": {
+          "label": "Global",
+          "action": "profile",
+          "profile": "Global"
+        }
+      }
+    },
+    {
+      "name": "Firefox",
+      "match": [
+        {
+          "app": "org.mozilla.firefox.desktop"
+        }
+      ],
+      "keys": {
+        "F13": {
+          "label": "digitar url",
+          "action": "combo",
+          "combo": "ctrl+l"
+        },
+        "F14": {
+          "label": "nova aba",
+          "action": "combo",
+          "combo": "ctrl+t",
+          "double": {
+            "label": "nova janela",
+            "action": "combo",
+            "combo": "ctrl+n"
+          }
+        },
+        "F15": {
+          "label": "reabrir aba",
+          "action": "combo",
+          "combo": "ctrl+shift+t"
+        },
+        "F16": {
+          "label": "fechar aba",
+          "action": "combo",
+          "combo": "ctrl+w",
+          "double": {
+            "label": "reabrir aba",
+            "action": "combo",
+            "combo": "ctrl+shift+t"
+          }
+        },
+        "F17": {
+          "label": "outra janela",
+          "action": "combo",
+          "combo": "alt+grave"
+        },
+        "F18": {
+          "label": "Global",
+          "action": "profile",
+          "profile": "Global"
+        },
+        "F19": {
+          "label": "aba <-",
+          "action": "combo",
+          "combo": "ctrl+shift+tab"
+        },
+        "F20": {
+          "label": "topo",
+          "action": "combo",
+          "combo": "home"
+        },
+        "F21": {
+          "label": "aba ->",
+          "action": "combo",
+          "combo": "ctrl+tab"
+        }
+      }
+    },
+    {
+      "name": "Global",
+      "fallback": true,
+      "match": [],
+      "keys": {
+        "F13": {
+          "label": "Terminal",
+          "action": "combo",
+          "combo": "ctrl+alt+t",
+          "double": {
+            "label": "claude",
+            "action": "text",
+            "text": "/claude\n"
+          }
+        },
+        "F14": {
+          "label": "copiar/colar",
+          "action": "combo",
+          "combo": [
+            "ctrl+c",
+            "ctrl+v"
+          ],
+          "mode": "cycle"
+        },
+        "F15": {
+          "label": "Arquivos",
+          "action": "launch",
+          "app": "org.gnome.Nautilus.desktop"
+        },
+        "F16": {
+          "label": "Fechar",
+          "action": "combo",
+          "combo": "alt+f4"
+        },
+        "F17": {
+          "label": "Desktop",
+          "action": "combo",
+          "combo": "ctrl+alt+d"
+        },
+        "F18": {
+          "label": "Firefox",
+          "action": "launch",
+          "app": "org.mozilla.firefox.desktop"
+        },
+        "F19": {
+          "label": "janela ←",
+          "action": "combo",
+          "combo": "alt+shift+tab",
+          "mode": "switcher"
+        },
+        "F20": {
+          "label": "visão geral",
+          "action": "combo",
+          "combo": "super"
+        },
+        "F21": {
+          "label": "janela →",
+          "action": "combo",
+          "combo": "alt+tab",
+          "mode": "switcher"
+        }
+      },
+      "chords": {
+        "F13+F18": {
+          "label": "Whatsapp",
+          "action": "url",
+          "url": "web.whatsapp.com"
+        },
+        "F15+F18": {
+          "label": "gemini",
+          "action": "url",
+          "url": "https://gemini.google.com/app"
+        }
+      }
+    }
+  ]
+}
