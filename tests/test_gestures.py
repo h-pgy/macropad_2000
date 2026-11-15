@@ -610,6 +610,18 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(keys["F21"], {"label": "janela", "action": "combo", "combo": "alt+tab", "mode": "switcher"})
         self.assertEqual(self.buttons(out), self.buttons(legacy))
 
+    def test_rotated_flag(self):
+        # layout.rotated (Girar teclado na UI): só é escrito quando ligado, e o daemon aceita
+        server.CONFIG.write_text(as_json(LEGACY_TOML), encoding="utf-8")
+        cfg = server.read_config()
+        self.assertIs(cfg["rotated"], False)
+        self.assertNotIn("rotated", json.loads(server.dump_config(cfg))["layout"])
+        cfg["rotated"] = True
+        out = server.dump_config(cfg)
+        server.validate(out)
+        self.assertIs(json.loads(out)["layout"]["rotated"], True)
+        self.assertEqual(self.roundtrip(out), out)
+
     def test_rejects_non_object(self):
         server.CONFIG.write_text("[]", encoding="utf-8")
         with self.assertRaises(ValueError):

@@ -149,7 +149,8 @@
   .key.holding { background: var(--hold); color: #fff; }
   .key.holding .num { color: #fff; }
   .knob-area { display: flex; flex-direction: column; align-items: center; gap: 8px; order: -1; } /* knob à esquerda */
-  /* teclado girado 180°: knob à direita, botões 6 5 4 / 3 2 1 (cada número segue o botão físico) */
+  /* teclado girado 180°: knob à direita, botões 6 5 4 / 3 2 1 (cada número segue o botão físico; as funções
+     foram espelhadas entre as fileiras pelo "Girar teclado", então continuam no mesmo lugar em relação ao knob) */
   .pad.flip .knob-area { order: 1; }
   .pad.flip .key[data-key="F13"] { order: 6; } .pad.flip .key[data-key="F14"] { order: 5; }
   .pad.flip .key[data-key="F15"] { order: 4; } .pad.flip .key[data-key="F16"] { order: 3; }
@@ -656,7 +657,7 @@
           </div>
         </div>
         <div class="rot-wrap">
-          <button class="rot" id="pad-flip" type="button" aria-pressed="false" title="Girar o desenho 180° (knob à direita ou à esquerda)">
+          <button class="rot" id="pad-flip" type="button" aria-pressed="false" title="Macropad virado 180° (knob à direita): espelha as funções entre as fileiras (1⇄4, 2⇄5, 3⇄6) em todos os perfis, para cada uma continuar no mesmo lugar em relação ao knob">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>
               <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
@@ -932,6 +933,9 @@ const NAMES = {
 };
 // combinações (dois botões juntos): só os botões 1 a 6. Nome "F13+F14", com o botão de número menor primeiro.
 const BUTTON_KEYS = ["F13", "F14", "F15", "F16", "F17", "F18"];
+// "Girar teclado": com o macropad virado 180°, a fileira de cima vira a de baixo e o knob passa para a
+// direita. Trocar as fileiras (1⇄4, 2⇄5, 3⇄6) deixa cada função no mesmo lugar em relação ao knob.
+const MIRROR = { F13: "F16", F14: "F17", F15: "F18", F16: "F13", F17: "F14", F18: "F15" };
 const isChord = (k) => typeof k === "string" && k.includes("+");
 const chordKeys = (k) => k.split("+");
 const btnNum = (k) => BUTTON_KEYS.indexOf(k) + 1;
@@ -963,7 +967,7 @@ const MODE_DESCS = {
   "combo.cycle": "Cada vez, aperta o próximo atalho da lista e volta ao início no fim. Atenção: no terminal, <code>ctrl+c</code> interrompe o Claude Code; lá, copiar/colar texto é <code>ctrl+shift+c</code> / <code>ctrl+shift+v</code>.",
   "combo.switcher": "Para o knob: segura o <b>primeiro modificador</b> (ex.: Alt) enquanto você gira e solta sozinho após uma pausa — como manter o Alt apertado e ir dando Tab. Apertar outra tecla durante a troca só confirma a escolha.",
   "text.cycle": "Cada vez, digita o próximo texto da lista e volta ao início no fim.",
-  "profile.latch": "Fixa o macropad no perfil escolhido, ignorando a janela em foco (badge amarelo, com cadeado). <b>O mesmo gesto</b> de novo volta ao automático — mesmo que no perfil fixado o botão tenha outra ação. Perfis novos já vêm com o botão 6 acionando o Global.",
+  "profile.latch": "Fixa o macropad no perfil escolhido, ignorando a janela em foco (badge amarelo, com cadeado). <b>O mesmo gesto</b> de novo volta ao automático — mesmo que no perfil fixado o botão tenha outra ação. Perfis novos já vêm com o botão 6 (o 3, com o teclado girado) acionando o Global.",
   "profile.toggle": "Perfil por um toque: a <b>próxima ação</b> do macropad roda nesse perfil e ele volta sozinho. O mesmo gesto de novo cancela.",
 };
 const CHIPS = {
@@ -1134,7 +1138,7 @@ function msg(text, cls = "") { const m = $("#save-msg"); m.textContent = text; m
 function changed() { renderPad(); renderChords(); renderProfiles(); dirty(); }
 
 // ------------------------------------------------------------ render: botões
-function renderAll() { fixChordSel(); renderPTabs(); renderPad(); renderChords(); renderEditor(); renderProfiles(); renderLive(); }
+function renderAll() { fixChordSel(); renderRotation(); renderPTabs(); renderPad(); renderChords(); renderEditor(); renderProfiles(); renderLive(); }
 
 function renderPTabs() {
   const box = $("#ptabs"); box.replaceChildren();
@@ -1829,7 +1833,7 @@ function moveTo(from, to, keepFocus = false) {
 
 function newProfile(name, rule) {
   const keys = Object.fromEntries(KEYS.map((k) => [k, blankKey(false)]));
-  keys[LOCK_KEY] = { inherit: false, long: null, double: null,
+  keys[cfg.rotated ? MIRROR[LOCK_KEY] : LOCK_KEY] = { inherit: false, long: null, double: null,
     tap: { ...blankGesture(), action: "profile", mode: "latch", profile: globalP().name, label: globalP().name } };
   const p = { name: uniqueName(name), fallback: false, match: rule ? [rule] : [], keys, chords: {} };
   const gi = cfg.profiles.findIndex((x) => x.fallback);
@@ -2558,19 +2562,57 @@ for (const [u, name] of Object.entries(URL_CHIPS)) $('[data-chips="url"]').appen
 window.addEventListener("beforeunload", (e) => { if (cfg && JSON.stringify(cfg) !== saved) e.preventDefault(); });
 setInterval(() => { if (!$("#tab-profiles").hidden && cfg) renderRecents(); }, 5000);
 
-// posição do macropad na mesa: só muda o desenho (preferência deste navegador)
-const applyFlip = (on) => { $("#pad").classList.toggle("flip", on); $("#pad-flip").setAttribute("aria-pressed", on); if (cfg) { renderMiniPad(); renderChords(); } };
-try { applyFlip(localStorage.getItem("padFlip") === "1"); } catch {}
+// Girar teclado: o macropad virado 180° na mesa (knob à direita). Além de girar o desenho, espelha as
+// funções entre as fileiras (MIRROR) em todos os perfis, botões e combinações, para cada função continuar
+// no mesmo lugar em relação ao knob: a voz, colada no knob na fileira de cima, vai do botão 1 para o 4.
+// Fica no config.json (layout.rotated), junto com as teclas que ele mudou; o daemon não precisa saber.
+function renderRotation() {
+  const on = !!cfg?.rotated;
+  $("#pad").classList.toggle("flip", on); $("#pad-flip").setAttribute("aria-pressed", on);
+}
+function mirrorFunctions() {
+  const m = (k) => MIRROR[k] || k;
+  for (const p of cfg.profiles) {
+    p.keys = { ...p.keys, ...Object.fromEntries(BUTTON_KEYS.map((k) => [m(k), p.keys[k]])) };
+    p.chords = Object.fromEntries(Object.entries(p.chords || {})
+      .map(([k, c]) => [chordOf(...chordKeys(k).map(m)), c]).sort(([a], [b]) => chordSort(a, b)));
+  }
+  cfg.rotated = !cfg.rotated;
+  // a seleção vai junto com a função
+  sel = isChord(sel) ? chordOf(...chordKeys(sel).map(m)) : m(sel);
+  lastKey = m(lastKey);
+}
+function rotatePad() {
+  setChordMode({ shift: false, sticky: false });
+  mirrorFunctions(); swapUndo = null;
+  renderRotation(); changed(); renderEditor();
+  const pending = JSON.stringify(cfg) !== saved;
+  msg(`${cfg.rotated ? "Teclado girado" : "Teclado na posição normal"}: funções espelhadas entre as fileiras (botões 1⇄4, 2⇄5 e 3⇄6) em todos os perfis${pending ? " — falta salvar." : "."}`, pending ? "warn" : "");
+}
+// cada nome sai do botão onde estava (depois do giro) e assenta no botão novo, na outra fileira
+function flyLabels() {
+  if (reduceMotion()) return;
+  const lbl = (k) => keyEl(k).querySelector(".lbl");
+  const at = Object.fromEntries(BUTTON_KEYS.map((k) => [k, lbl(k).getBoundingClientRect()]));
+  for (const k of BUTTON_KEYS) {
+    const to = MIRROR[k], key = keyEl(to);
+    key.classList.add("flying");
+    lbl(to).animate([{ transform: `translate(${at[k].left - at[to].left}px, ${at[k].top - at[to].top}px)` }, { transform: "none" }],
+                    { duration: SPRING_MS, easing: SPRING }).finished.catch(() => {}).then(() => key.classList.remove("flying"));
+  }
+}
+try { localStorage.removeItem("padFlip"); } catch {}  // antes, o giro era só do desenho e ficava no navegador
 $("#pad-flip").addEventListener("click", (ev) => {
-  const btn = ev.currentTarget, pad = $("#pad"), on = !pad.classList.contains("flip");
-  btn.setAttribute("aria-pressed", on); // o ícone gira junto
-  try { localStorage.setItem("padFlip", on ? "1" : "0"); } catch {}
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !pad.animate) return applyFlip(on);
-  // o desenho gira 180° e, no fim, troca para o layout invertido com os textos de pé
+  if (!cfg || drag.el || drag.busy) return;
+  const btn = ev.currentTarget, pad = $("#pad");
+  if (reduceMotion() || !pad.animate) return rotatePad();
+  btn.setAttribute("aria-pressed", !cfg.rotated); // o ícone gira junto
+  // o desenho gira 180°; no fim, troca para o layout invertido com os textos de pé e as funções
+  // trocam de fileira
   btn.disabled = true;
   const anim = pad.animate([{ transform: "rotate(0)" }, { transform: "rotate(180deg)" }],
                            { duration: 450, easing: "cubic-bezier(.5, 0, .3, 1)", fill: "forwards" });
-  anim.onfinish = () => { applyFlip(on); anim.cancel(); btn.disabled = false; };
+  anim.onfinish = () => { rotatePad(); anim.cancel(); btn.disabled = false; flyLabels(); };
 });
 
 // #usage, #health… abre direto naquela aba

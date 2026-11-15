@@ -78,7 +78,7 @@ macropad ──F13..F21──▶ daemon (python-evdev) ──teclas/rolagem─�
   | Knob, girar para a esquerda | `F19` | Knob, girar para a direita | `F21` |
   | Knob, apertar | `F20` | | |
 
-  Os botões 1 a 3 ficam na fileira de cima e o knob à esquerda (na UI, **Girar teclado** inverte o desenho se você usa o macropad virado).
+  Os botões 1 a 3 ficam na fileira de cima e o knob à esquerda (se você usa o macropad virado, com o knob à direita, veja **Girar teclado** na [UI](#ui)).
 - **O daemon** (`daemon/macropad_claude.py`) captura o macropad (as teclas F13+ não chegam aos aplicativos), escolhe o perfil pela janela em foco, reconhece o gesto e executa a ação. Reconecta sozinho se o macropad for desplugado. A configuração fica em `config.json`, na raiz e versionado no git.
 - **A extensão do GNOME** (`gnome-extension/`, JavaScript sem compilação) informa a janela em foco, abre ou foca aplicativos, abre sites, mostra o modo (badge na barra e aviso ao trocar) e faz a captura de atalho da UI. Ela é necessária porque, no Wayland, programas comuns não conseguem saber qual janela está ativa. Sem ela, vale sempre o perfil Global.
 - **A UI** (`ui/server.py` + `ui/index.html`, só biblioteca padrão) edita o `config.json` e mostra o que o daemon está fazendo. Veja [UI](#ui).
@@ -180,7 +180,7 @@ Na barra do topo: o estado do daemon, do macropad e da extensão, o perfil ativo
 - **Ajudas:** sugestões prontas de textos (`/clear`, `/usage`, `/compact`…), de atalhos (um carrossel), de listas e de sites. **Capturar** pega o próximo atalho que você apertar, inclusive os do sistema, como Ctrl+Alt+T (pela extensão do GNOME; sem ela, a captura é pelo navegador e não pega esses). A lista de aplicativos tem filtro. Ao escolher um app, um perfil ou um site, o nome do botão é preenchido sozinho, enquanto você não escrever outro.
 - **Trocar de lugar:** arraste um botão sobre outro para trocar os dois, com todos os gestos e as combinações deles (um botão herdado do Global vira ação própria do perfil). **Desfazer**, na barra de salvar, volta a troca.
 - **Combinações:** segure Shift e clique em dois botões (ou use o botão **Combinação** ou a faixa **Nova combinação**). Elas aparecem embaixo do desenho e usam o mesmo editor. No Global, cada uma tem a caixa **Herdar nos outros perfis**; nos outros perfis, as herdadas aparecem à parte, na linha **Do Global**.
-- **Girar teclado** gira o desenho 180°, para o macropad usado com o knob à direita (fica lembrado neste navegador).
+- **Girar teclado**, para o macropad usado virado 180° (knob à direita): gira o desenho e espelha as funções entre as fileiras (botões 1⇄4, 2⇄5 e 3⇄6) em todos os perfis, com as combinações junto. Assim cada função fica no mesmo lugar em relação ao knob: a voz, colada no knob na fileira de cima, passa do botão 1 para o 4. Vale ao salvar, e fica no `config.json` (`"layout": {"rotated": true}`). Clicar de novo desfaz.
 - **Último evento** mostra o que acabou de chegar do macropad; **ver todos →** leva à lista na aba Uso.
 - **Layout do teclado**, no fim do editor: ABNT2 (o padrão) ou US. Os textos são digitados como teclas físicas, então a `/` depende do layout.
 

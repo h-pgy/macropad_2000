@@ -142,8 +142,11 @@ def read_config() -> dict:
         })
     # o fallback fica sempre por último (ele não tem regras, a ordem não importa para ele)
     profiles.sort(key=lambda p: p["fallback"])
-    return {"slash_key": raw.get("layout", {}).get("slash_key", "KEY_RO"), "timing": raw.get("timing", {}),
-            "profiles": profiles}
+    layout = raw.get("layout", {})
+    # rotated: o macropad está girado 180° (knob à direita). Só a UI usa: ao girar, ela já espelha as
+    # funções nas teclas (1⇄4, 2⇄5, 3⇄6), então o daemon segue lendo as teclas como estão.
+    return {"slash_key": layout.get("slash_key", "KEY_RO"), "rotated": layout.get("rotated") is True,
+            "timing": raw.get("timing", {}), "profiles": profiles}
 
 
 def dump_gesture(g: dict, where: str, top: bool) -> dict:
@@ -231,6 +234,8 @@ def config_data(cfg: dict) -> dict:
     if len(set(n.lower() for n in names)) != len(names):
         raise ValueError("há perfis com o mesmo nome")
     data = {"layout": {"slash_key": str(cfg.get("slash_key", "KEY_RO"))}}
+    if cfg.get("rotated") is True:
+        data["layout"]["rotated"] = True
     timing = {k: int(v) for k, v in (cfg.get("timing") or {}).items() if k in TIMING_KEYS}
     if timing:
         data["timing"] = timing
